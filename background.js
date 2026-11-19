@@ -14,21 +14,21 @@ const recordingTabs = async () => (await chrome.storage.session.get('tabs')).tab
 const setRecordingTabs = (tabs) => chrome.storage.session.set({ tabs });
 
 // Settings are cached because they are needed for every network event.
-let settings = { keepExamples: false, allTypes: false };
+let settings = { keepExamples: true };
 const settingsReady = chrome.storage.local.get('settings').then((saved) => { settings = { ...settings, ...saved.settings }; });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.settings) settings = { keepExamples: false, allTypes: false, ...changes.settings.newValue };
+  if (area === 'local' && changes.settings) settings = { keepExamples: true, ...changes.settings.newValue };
 });
 
 async function load() {
   await settingsReady;
   const { store } = await chrome.storage.local.get('store');
-  return { store: store ?? createStore(), keepExamples: settings.keepExamples, allTypes: settings.allTypes };
+  return { store: store ?? createStore(), keepExamples: settings.keepExamples };
 }
 
 const capture = createCapture({
   getBody: (tabId, requestId) => chrome.debugger.sendCommand({ tabId }, 'Network.getResponseBody', { requestId }),
-  wantAll: () => settings.allTypes,
+  wantAll: () => true, // every request type, from every host the page talks to
   onEntry: (entry) => enqueue(async () => {
     if (!/^https?:/.test(entry.url)) return;
     const { store, keepExamples } = await load();
@@ -93,7 +93,7 @@ async function handle(msg) {
       await chrome.storage.local.set({ store: createStore() });
       return null;
     case 'setSettings':
-      await chrome.storage.local.set({ settings: { keepExamples: Boolean(msg.keepExamples), allTypes: Boolean(msg.allTypes) } });
+      await chrome.storage.local.set({ settings: { keepExamples: Boolean(msg.keepExamples) } });
       return null;
     default:
       return null;

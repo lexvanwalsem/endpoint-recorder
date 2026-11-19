@@ -1,6 +1,6 @@
 {
   "name": "endpoint-recorder",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "license": "MIT",
   "description": "Chrome extension that records the network calls of one tab and builds a map of endpoints, fields and real example responses.",

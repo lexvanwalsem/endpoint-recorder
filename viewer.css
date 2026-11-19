@@ -14,7 +14,7 @@ header h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
 
 main { flex: 1; display: grid; grid-template-columns: minmax(380px, 480px) 1fr; min-height: 0; }
 #left { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-right: 1px solid var(--line); }
-#right { overflow: auto; padding: 22px 28px 48px; min-width: 0; }
+#right { overflow: auto; padding: 20px 24px 40px; min-width: 0; }
 
 .filters { padding: 14px; display: grid; gap: 10px; border-bottom: 1px solid var(--line); }
 .filters input[type=search] { width: 100%; padding-left: 12px; }
@@ -24,24 +24,18 @@ main { flex: 1; display: grid; grid-template-columns: minmax(380px, 480px) 1fr; 
 
 #list { overflow: auto; flex: 1; padding: 8px; }
 .item {
-  display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 10px 12px; margin-bottom: 4px;
-  border: 1px solid transparent; border-radius: var(--radius); cursor: pointer;
+  padding: 9px 12px; margin-bottom: 3px; border: 1px solid transparent; border-radius: var(--radius); cursor: pointer;
 }
 .item:hover { background: var(--panel); }
 .item.selected { background: var(--accent-weak); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .item .top { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
 .item .path { overflow-wrap: anywhere; font-weight: 600; }
 .item .rpc { color: var(--accent); }
-.item .host { font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
-.item .stats { grid-row: 1 / span 2; grid-column: 2; text-align: right; font-variant-numeric: tabular-nums; min-width: 78px; }
-.item .stats b { font-size: 17px; }
-.meter { height: 4px; border-radius: 2px; background: var(--line); margin: 4px 0 2px auto; width: 78px; overflow: hidden; }
-.meter > i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.item .meta { font-size: 13.5px; color: var(--muted); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; overflow-wrap: anywhere; }
 
 .empty { padding: 56px 24px; text-align: center; color: var(--muted); }
 .empty .big { font-size: 15px; color: var(--text); margin-bottom: 6px; }
 
-.detail { max-width: 1100px; }
 .detail .title { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .detail h2 { margin: 0; font-size: 21px; overflow-wrap: anywhere; letter-spacing: -.01em; }
 .detail .rpc { color: var(--accent); }
@@ -64,7 +58,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(380px, 480px) 1fr; 
 .seg button:hover { background: none; color: var(--text); }
 .seg button.active:hover { background: var(--surface); }
 .panel-head input[type=search] { margin-left: auto; min-width: 240px; }
-.tablewrap { max-height: 62vh; overflow: auto; }
+.tablewrap { max-height: 72vh; overflow: auto; }
 
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 7px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -109,3 +103,8 @@ header h1, header button { white-space: nowrap; }
 .filters .selects { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .filters .selects select { min-width: 0; width: 100%; }
 .json.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.detail .title .spacer { flex: 1; }
+.detail .title button { padding: 5px 12px; font-size: 13.5px; }
+.detail .chips { margin: 0 0 4px; }
+.hint { margin-top: 12px; font-size: 13.5px; }

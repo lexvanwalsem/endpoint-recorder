@@ -41,11 +41,12 @@ what a system returns with what its documentation promises.
   request type and errors. Sort on calls, speed or recency.
 - **Timing and size.** Average and slowest time, average and largest transfer size, status codes, content types.
 - **Export.** Markdown for reading and sharing, JSON for processing. The export follows your filters.
-- **Optional: all request types.** Also record pages, scripts, styles, images and fonts (type and size only for those).
+- **Every request, every host.** API calls are recorded together with pages, scripts, styles, images and fonts, and with
+  calls to other domains (analytics, CDNs, other services). Filter by type or host in the full view.
 - **Light and dark.** Follows your browser theme.
 
 <p align="center">
-  <img src="docs/popup.png" alt="The toolbar popup while recording" width="300">
+  <img src="docs/popup.png" alt="The toolbar popup while recording" width="260">
 </p>
 
 ## Install
@@ -64,10 +65,9 @@ After changing the code, press the refresh icon on the extension card.
 1. Open the web app in a tab and click the extension icon.
 2. Press **Record this tab**. Chrome shows a bar saying "Endpoint Recorder started debugging this browser".
    Leave it open: closing it stops the recording.
-3. Tick **Keep example values and sample calls** if you want the real requests and responses (see Privacy below).
-4. Use the app as you normally would: open a ticket, reply to a mail, run a report. Press **Reload tab** if you also
+3. Use the app as you normally would: open a ticket, reply to a mail, run a report. Press **Reload tab** if you also
    want the calls made while the page loads.
-5. Click **Open full view** to search, filter and inspect. **Export Markdown** or **Export JSON** to take it with you.
+4. Click **Open full view** to search, filter and inspect. **Export Markdown** or **Export JSON** to take it with you.
 
 ## What you get
 
@@ -104,9 +104,9 @@ Response fields
   The recording lives in `chrome.storage.local` until you press **Clear** or remove the extension.
 - **Request headers are not read**, with one exception: `Content-Type`, to know how to read a body. Cookies,
   authorization headers and tokens never enter the recording.
-- **Example values and sample calls are opt-in.** Off by default, only field names and types are kept. When on, the
-  latest three calls per endpoint are stored with their URL (including query values) and a shortened body. That can
-  contain personal data or secrets that appear in URLs or bodies.
+- **Example data is on by default.** The latest three calls per endpoint are stored with their URL (including query
+  values) and a shortened body, so you can see what an endpoint returns. That can contain personal data or secrets that
+  appear in URLs or bodies. Untick **Keep example data** under Options in the popup to keep only field names and types.
 - **Treat exports like the data they come from.** Do not commit them or share them if they hold customer data.
 - **Record only systems you are allowed to look into**, and respect their terms of use.
 

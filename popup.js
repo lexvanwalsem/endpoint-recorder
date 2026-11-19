@@ -9,35 +9,18 @@ try { host = new URL(tab.url).host; } catch { /* no usable tab */ }
 $('site').textContent = host || tab?.title || 'unknown tab';
 
 async function render() {
-  const { store, recording, keepExamples, allTypes } = await send({ type: 'get', tabId: tab.id });
-  const eps = Object.values(store.endpoints).sort((a, b) => b.count - a.count);
-  $('toggle').textContent = recording ? 'Stop recording this tab' : 'Record this tab';
+  const { store, recording, keepExamples } = await send({ type: 'get', tabId: tab.id });
+  const eps = Object.values(store.endpoints);
+  const calls = eps.reduce((s, e) => s + e.count, 0);
+  $('toggle').textContent = recording ? 'Stop recording' : 'Record this tab';
   $('toggle').classList.toggle('primary', !recording);
   if (document.activeElement !== $('examples')) $('examples').checked = keepExamples;
-  if (document.activeElement !== $('allTypes')) $('allTypes').checked = allTypes;
 
-  const calls = eps.reduce((s, e) => s + e.count, 0);
-  const line = document.createElement('div');
-  line.className = 'big';
-  if (recording) {
-    const dot = document.createElement('span');
-    dot.className = 'rec-dot';
-    line.append(dot);
-  }
-  line.append(`${recording ? 'Recording' : 'Not recording'}`);
-  const detail = document.createElement('div');
-  detail.className = 'muted';
-  detail.textContent = `${eps.length} endpoints, ${calls} calls in the recording`;
+  const line = document.createDocumentFragment();
+  if (recording) line.append(Object.assign(document.createElement('span'), { className: 'rec-dot' }));
+  line.append(`${recording ? 'Recording' : 'Not recording'}: ${eps.length} endpoints, ${calls} calls`);
   $('state').className = `status${recording ? ' on' : ''}`;
-  $('state').replaceChildren(line, detail);
-
-  $('list').replaceChildren(...eps.slice(0, 8).map((ep) => {
-    const row = document.createElement('div');
-    const n = Object.assign(document.createElement('span'), { className: 'n', textContent: ep.count });
-    const u = Object.assign(document.createElement('span'), { className: 'u mono', textContent: `${ep.method} ${ep.path}${ep.rpc ? ` [${ep.rpc}]` : ''}` });
-    row.append(n, u);
-    return row;
-  }));
+  $('state').replaceChildren(line);
   return recording;
 }
 
@@ -49,9 +32,7 @@ $('toggle').onclick = async () => {
 };
 
 $('reload').onclick = () => chrome.tabs.reload(tab.id);
-const saveSettings = () => send({ type: 'setSettings', keepExamples: $('examples').checked, allTypes: $('allTypes').checked });
-$('examples').onchange = saveSettings;
-$('allTypes').onchange = saveSettings;
+$('examples').onchange = () => send({ type: 'setSettings', keepExamples: $('examples').checked });
 
 $('open').onclick = async () => {
   const url = chrome.runtime.getURL('viewer.html');

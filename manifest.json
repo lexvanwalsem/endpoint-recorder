@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Endpoint Recorder",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Records the network calls of one browser tab and shows endpoints, fields, content types, sizes and real example responses. Switch it on per tab from the toolbar icon.",
   "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
   "action": {

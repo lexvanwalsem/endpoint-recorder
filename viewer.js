@@ -80,21 +80,17 @@ function renderList(eps) {
       none ? 'Open a tab, click the extension icon and press "Record this tab".' : 'Change or clear the filters above.'));
     return;
   }
-  const max = Math.max(...eps.map((e) => e.count));
   list.replaceChildren(...eps.map((ep) => h('div', {
     class: `item${ep.key === state.selected ? ' selected' : ''}`,
     onclick: () => { state.selected = ep.key; state.fieldQ = ''; state.sample = 0; render(); },
   },
   h('div', { class: 'top' },
     h('span', { class: `mpill ${ep.method}` }, ep.method),
-    h('span', { class: 'path mono' }, highlight(ep.path, state.q.trim()), ep.rpc ? h('span', { class: 'rpc' }, ` ${ep.rpc}`) : null),
-    ep.type && !['XHR', 'Fetch'].includes(ep.type) ? h('span', { class: 'pill' }, ep.type) : null),
-  h('div', { class: 'host' }, ep.host),
-  h('div', { class: 'stats' },
-    h('b', {}, ep.count), h('span', { class: 'muted' }, ep.count === 1 ? ' call' : ' calls'),
-    h('div', { class: 'meter' }, h('i', { style: `width:${Math.max(6, Math.round((ep.count / max) * 100))}%` })),
-    h('span', { class: 'muted' }, `${Math.round(avg(ep))} ms`),
-    hasError(ep) ? h('div', {}, h('span', { class: 'pill err' }, plural(errorCount(ep), 'error'))) : null))));
+    h('span', { class: 'path mono' }, highlight(ep.path, state.q.trim()), ep.rpc ? h('span', { class: 'rpc' }, ` ${ep.rpc}`) : null)),
+  h('div', { class: 'meta' },
+    `${ep.host} · ${plural(ep.count, 'call')} · ${Math.round(avg(ep))} ms`,
+    ep.type && !['XHR', 'Fetch'].includes(ep.type) ? h('span', { class: 'pill' }, ep.type) : null,
+    hasError(ep) ? h('span', { class: 'pill err' }, plural(errorCount(ep), 'error')) : null))));
 }
 
 function fieldTable(node, term) {
@@ -218,23 +214,20 @@ function renderDetail(eps) {
   right.replaceChildren(h('div', { class: 'detail' },
     h('div', { class: 'title' },
       h('span', { class: `mpill ${ep.method}` }, ep.method),
-      h('h2', { class: 'mono' }, ep.path, ep.rpc ? h('span', { class: 'rpc' }, ` ${ep.rpc}`) : null)),
+      h('h2', { class: 'mono' }, ep.path, ep.rpc ? h('span', { class: 'rpc' }, ` ${ep.rpc}`) : null),
+      h('span', { class: 'spacer' }),
+      copyMd,
+      h('button', { onclick: () => download(`endpoint-${slug}.json`, JSON.stringify(ep, null, 2), 'application/json') }, 'Download JSON')),
     h('div', { class: 'sub muted' }, ep.host),
     h('div', { class: 'cards' },
       card('Calls', ep.count), card('Average', `${Math.round(avg(ep))} ms`), card('Slowest', `${Math.round(ep.timeMax)} ms`),
-      ep.sizeCount ? card('Size (avg / max)', `${formatBytes(ep.sizeSum / ep.sizeCount)} / ${formatBytes(ep.sizeMax)}`, true) : null,
-      card('First seen', time(ep.firstSeen), true), card('Last seen', time(ep.lastSeen), true)),
-    h('div', { class: 'block' }, h('div', { class: 'label' }, 'Status codes'),
-      h('div', { class: 'chips' }, Object.entries(ep.statuses).map(([s, n]) => h('span', { class: `pill ${Number(s) >= 400 ? 'err' : 'ok'}` }, `${s}  x${n}`)))),
-    Object.keys(ep.reqTypes ?? {}).length ? h('div', { class: 'block' }, h('div', { class: 'label' }, 'Request content types'),
-      h('div', { class: 'chips' }, Object.entries(ep.reqTypes).map(([k, n]) => h('span', { class: 'pill mono' }, `${k} x${n}`)))) : null,
-    Object.keys(ep.resTypes ?? {}).length ? h('div', { class: 'block' }, h('div', { class: 'label' }, 'Response content types'),
-      h('div', { class: 'chips' }, Object.entries(ep.resTypes).map(([k, n]) => h('span', { class: 'pill mono' }, `${k} x${n}`)))) : null,
-    Object.keys(ep.query).length ? h('div', { class: 'block' }, h('div', { class: 'label' }, 'Query parameters (names only)'),
-      h('div', { class: 'chips' }, Object.entries(ep.query).map(([k, n]) => h('span', { class: 'pill mono' }, `${k} (${n})`)))) : null,
-    h('div', { class: 'tools' }, copyMd,
-      h('button', { onclick: () => download(`endpoint-${slug}.json`, JSON.stringify(ep, null, 2), 'application/json') }, 'Download JSON')),
-    ep.samples?.length ? null : h('div', { class: 'note' }, 'No example calls were stored for this endpoint. Tick "Keep example values" in the extension popup and record again to see real requests and responses here.'),
+      ep.sizeCount ? card('Size (avg / max)', `${formatBytes(ep.sizeSum / ep.sizeCount)} / ${formatBytes(ep.sizeMax)}`, true) : null),
+    // one row of chips: status codes, response content types, query parameter names
+    h('div', { class: 'chips' },
+      Object.entries(ep.statuses).map(([s, n]) => h('span', { class: `pill ${Number(s) >= 400 ? 'err' : 'ok'}` }, `${s} x${n}`)),
+      Object.entries(ep.resTypes ?? {}).map(([k, n]) => h('span', { class: 'pill mono', title: 'Response content type' }, `${k} x${n}`)),
+      Object.keys(ep.query).map((k) => h('span', { class: 'pill mono', title: 'Query parameter' }, `?${k}`))),
+    ep.samples?.length ? null : h('div', { class: 'hint muted' }, 'No example calls stored. Turn on "Keep example data" in the extension popup and record again.'),
     side ? h('div', { class: 'panel' },
       h('div', { class: 'panel-head' },
         h('div', { class: 'seg' }, sides.map((s) => h('button', { class: side === s ? 'active' : '', onclick: () => { state.side = s; renderDetail(eps); } }, LABELS[s]))),

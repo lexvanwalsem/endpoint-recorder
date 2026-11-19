@@ -6,25 +6,23 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="stylesheet" href="styles.css">
 <style>
-  body { width: 430px; padding: 16px; font-size: 15px; }
-  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; }
+  body { width: 340px; padding: 16px; font-size: 15px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
   .brand { display: flex; align-items: center; gap: 10px; }
-  .brand img { display: block; border-radius: 7px; }
-  h1 { font-size: 18px; margin: 0; }
-  .site { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .status { margin: 10px 0; padding: 8px 10px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
-  .status.on { background: var(--danger-weak); border-color: transparent; }
-  .status .big { font-weight: 600; }
+  .brand img { display: block; }
+  h1 { font-size: 17px; margin: 0; }
+  .site { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  #toggle { width: 100%; padding: 11px; font-size: 16px; }
+  .status { margin: 12px 0; display: flex; align-items: center; min-height: 24px; }
+  .status.on { color: var(--danger); font-weight: 600; }
   .actions { display: flex; gap: 8px; }
   .actions button { flex: 1; }
-  #list { margin-top: 10px; border-top: 1px solid var(--line); max-height: 190px; overflow: auto; }
-  #list div { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  #list .n { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-  #list .u { overflow-wrap: anywhere; }
-  .more { display: grid; gap: 6px; margin-top: 12px; }
+  details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  summary { cursor: pointer; color: var(--muted); }
+  details[open] summary { margin-bottom: 10px; }
+  .note { font-size: 12.5px; margin: 4px 0 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; }
   .err { color: var(--danger); margin-top: 6px; }
-  .note { font-size: 12.5px; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -32,27 +30,23 @@
   <div class="brand"><img src="icons/icon-32.png" width="30" height="30" alt=""><h1>Endpoint Recorder</h1></div>
   <span id="site" class="muted site"></span>
 </div>
-<div class="actions">
-  <button id="toggle" class="primary"></button>
-  <button id="reload" title="Reload this tab so the calls made while the page loads are caught too">Reload tab</button>
-</div>
+<button id="toggle" class="primary"></button>
 <div id="error" class="err"></div>
 <div id="state" class="status"></div>
-<button id="open" style="width:100%">Open full view: search, filter, details and export</button>
-<div id="list"></div>
-<div class="more">
-  <label><input id="allTypes" type="checkbox"> Record all request types, not only API calls</label>
-  <div class="muted note">Off: XHR and fetch calls only. On: also pages, scripts, styles, images and fonts (type and size only for those).</div>
-  <label><input id="examples" type="checkbox"> Keep example values and sample calls</label>
-  <div class="muted note">On: the real URL and shortened request and response of the latest calls are stored, so you can see
-    what an endpoint returns. This can contain customer data. Off: only field names and types are kept.
-    While recording, Chrome shows a bar "started debugging this browser": leave it open.</div>
+<div class="actions">
+  <button id="open">Open full view</button>
+  <button id="reload" title="Reload this tab so the calls made while the page loads are caught too">Reload tab</button>
+</div>
+<details>
+  <summary>Options and export</summary>
+  <label><input id="examples" type="checkbox"> Keep example data (URLs and responses)</label>
+  <div class="muted note">Stored on this computer only. It can contain customer data. While recording, Chrome shows a "debugging" bar: leave it open.</div>
   <div class="row">
     <button id="md">Export Markdown</button>
     <button id="json">Export JSON</button>
     <button id="clear" class="danger">Clear</button>
   </div>
-</div>
+</details>
 <script type="module" src="popup.js"></script>
 </body>
 </html>
