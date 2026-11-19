@@ -38,8 +38,8 @@ something you can read, search and share:
 - **Every endpoint on one screen**, grouped and named, with timing, size and status.
 - **Every field** of every request and response, with its type and how often it appears.
 - **Real example calls**: the full URL, what was sent, what came back, as formatted JSON.
-- **The story of what you did**: the calls grouped per step ("open the ticket", "reply", "close").
-- **The links between calls**: this id came from that response.
+- **The story of what you did**: the calls grouped into steps that Surveyor finds and names by itself ("Open ticket", "Close ticket").
+- **How it fits together**: for each step what it needs from earlier steps and what it passes on, in plain sentences.
 
 It works on any site, on a tab that is already open, without a proxy, certificates, command line or account.
 
@@ -55,8 +55,8 @@ from one call to the next.
 
 Surveyor is built around that second half:
 
-- **Steps** show which endpoints one action in the interface triggers.
-- **Data flow** shows where a value comes from and where it is used again.
+- **Steps, found automatically,** show which endpoints one action in the interface triggers.
+- **Data flow per step** shows where a value comes from and where it is used again, explained in plain sentences.
 - **Search by value** finds the endpoint and field behind anything you can see on screen.
 - **Real examples of every kind of body**, not only JSON: HTML, XML, form data and plain text too.
 - **Privacy by design**: request headers are never stored and everything stays on your computer.
@@ -70,10 +70,10 @@ This is what changes compared with working in the Chrome DevTools Network tab al
 | You want to know | Without Surveyor | With Surveyor |
 |---|---|---|
 | Where does this number on screen come from? | Open request after request until you spot it | Type the number. The endpoints that returned it are listed with the exact field, and the field opens |
-| What does clicking "Close ticket" trigger? | Clear the log, click, read the new rows, remember them | Mark a step, click. The step lists exactly its calls, in order |
+| What does clicking "Close ticket" trigger? | Clear the log, click, read the new rows, remember them | Just click. Surveyor starts a new step by itself and lists exactly its calls, in order |
 | Which endpoints exist? | A list where `/orders/1001` and `/orders/1002` are separate rows | One row per endpoint, ids become `{id}`, JSON-RPC and GraphQL are split by what they call |
 | Which fields can be missing? | Compare several responses by hand | Every field shows its type and how often it is present |
-| How do calls depend on each other? | Notice an id in one response and recognise it in a later URL | Shown as data flow: `POST /tickets/{id}/close` takes its `id` from `GET /tickets` |
+| How do calls depend on each other? | Notice an id in one response and recognise it in a later URL | Explained per step: "step 4 needs the ticket `id` that step 3 returned" |
 | What does an endpoint return? | Open one request at a time and switch to the response | Example calls per endpoint, with the URL, query values and formatted JSON |
 | Keep the result | Lost when DevTools closes or the log is cleared | Kept in the browser, exported as Markdown or JSON |
 | Share it with a colleague | Send a HAR file: a raw dump with every request | A readable report per endpoint, filtered to what matters |
@@ -101,8 +101,14 @@ the field and the value, for example `RECEIVED $.items[].customer.name = Fleur M
 
 ### Follow what an action triggers
 
-Type what you are about to do and press **Mark step**. The **Steps** view then shows the calls of each step in order,
-with time since the step, status, duration and size. Click a call to jump to its endpoint.
+Surveyor groups the calls into steps by itself, without you doing anything. A pause in the API traffic or a page
+navigation (also route changes in single page apps) starts a new step. Each step gets a name from what its calls do, for
+example "Open ticket", "Add message to ticket + Close ticket" or "Open /tickets". Calls that repeat at a regular interval
+(polling) are left out and listed separately under **Background calls**.
+
+Open a step to see its calls in order, with time since the step, status, duration and size. Click a call to jump to its
+endpoint. Want your own names? Type what you are about to do and press **Mark step** in the popup. Your steps are then
+shown instead, and you can switch between **Marked by you** and **Detected**.
 
 <p align="center">
   <img src="docs/steps.png" alt="Steps view: the calls made after each step you marked" width="900">
@@ -111,8 +117,9 @@ with time since the step, status, duration and size. Click a call to jump to its
 ### See how calls depend on each other
 
 When a value returned by one call (an id, a token, a code) is used again in a later path, query string or body, the link
-is shown on both endpoints: where a value comes from and where it goes. That is the sequence you need to reproduce a
-workflow.
+is recorded. The **Flow overview** at the top of the Steps view then tells the story, step by step: what the step needs
+from earlier steps, what happens inside it and what it passes on, with links to the calls involved. That is the sequence
+you need to reproduce a workflow. The same links show on each endpoint.
 
 ### Understand the data
 
@@ -155,11 +162,12 @@ After changing the code, press the refresh icon on the extension card.
 1. Open the web app in a tab and click the Surveyor icon.
 2. Press **Record this tab**. Chrome shows a bar saying "Surveyor started debugging this browser".
    Leave it open: closing it stops the recording.
-3. Before each thing you do, type a short description in the step field and press **Mark step**
-   ("open the ticket", "reply", "close"). This is optional, but it makes the result much easier to read.
-4. Use the app as you normally would. Press **Reload tab** if you also want the calls made while the page loads.
-5. Click **Open full view** to search, filter and inspect. Switch between **Endpoints** and **Steps** at the top left.
-   **Export Markdown** or **Export JSON** takes the result with you.
+3. Use the app as you normally would: open a ticket, reply, close it. Steps are detected automatically. Take a
+   short pause between actions: that is how Surveyor sees where one step ends and the next begins.
+   Press **Reload tab** if you also want the calls made while the page loads.
+4. Optional: before an action, type a name in the step field and press **Mark step** to use your own names.
+5. Click **Open full view** to search, filter and inspect. Switch between **Endpoints** and **Steps** at the top left,
+   and start with the **Flow overview**. **Export Markdown** or **Export JSON** takes the result with you.
 
 ## A Markdown export looks like this
 
@@ -188,7 +196,7 @@ Response fields
 | $.result[].author_id | array | 100% | |
 ````
 
-The export starts with a **Steps** section and a **Data flow** section when you used them.
+The export starts with a **Steps** section (with, per step, what it needs and what it passes on), a **Background calls** section and a **Data flow** section.
 
 ## Built to be trusted
 
@@ -227,6 +235,11 @@ method, URL, status, timing and size, and asks for the response body. `capture.m
 `recorder.mjs` groups them per endpoint, infers the field structure, keeps the examples and finds the links between
 calls. `viewer.html` shows the result, `popup.html` controls the recording.
 
+How steps are detected: calls are put in order of their start time. A pause of more than 1.5 seconds in the API traffic, or a
+page navigation, starts a new step. An endpoint is treated as polling when it is called at least four times at a regular
+interval between 3 and 180 seconds. A step is named after its calls that change something (POST, PUT, PATCH, DELETE),
+otherwise after its first call; the names come from simple rules on the method and the path, so check them.
+
 How an identifier is recognised for the data flow: a token or code (6 to 100 characters without spaces, with a digit or at
 least 16 characters), or a number of 10 or more in a field named like `id`, `token`, `key` or `code`. Links are a strong
 hint, not proof: check them. The newest call that returned a value is taken as its source.
@@ -242,6 +255,9 @@ hint, not proof: check them. The newest call that returned a value is taken as i
   60 keys per object and 8 levels deep. The field structure and the value search look at the first 20 items of each list,
   and remember up to 200 distinct values per endpoint.
 - The call log keeps the last 5000 calls and the data flow the last 3000 identifier values.
+- Step detection is a heuristic: calls made while you pause between clicks can end up in the wrong step, and two quick
+  actions can end up in one. Mark steps yourself when it matters.
+- Step names are guesses from the method and path, not knowledge of the system.
 - You only learn about what you click: calls you never trigger are not documented.
 - Chrome internal pages (`chrome://`) and the Chrome Web Store cannot be recorded.
 
@@ -264,7 +280,8 @@ npm test
 | `manifest.json` | Extension manifest (Manifest V3) |
 | `background.js` | Service worker: attaches the debugger, stores calls |
 | `capture.mjs` | Network events to finished calls (pure logic) |
-| `recorder.mjs` | Grouping, field inference, examples, steps, value search, data flow, Markdown report (pure logic) |
+| `recorder.mjs` | Grouping, field inference, examples, value search, links between calls, Markdown report (pure logic) |
+| `flow.mjs` | Steps (marked and detected), polling, step names, the flow explanation (pure logic) |
 | `popup.html`, `popup.js` | Toolbar popup |
 | `viewer.html`, `viewer.js`, `viewer.css` | Full view page |
 | `styles.css` | Shared design tokens and components |

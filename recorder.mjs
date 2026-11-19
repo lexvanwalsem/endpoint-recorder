@@ -1,6 +1,8 @@
 // Pure logic of Surveyor: group requests per endpoint, infer field structure, keep example calls, render a report.
 // No browser APIs here so it can be unit tested with node:test.
 
+import { detectPolling, describeFlow, endpointLabel, flowSentence, getSteps, isApiCall } from './flow.mjs';
+
 const MAX_DEPTH = 8;
 const MAX_ARRAY_ITEMS = 20;
 const MAX_EXAMPLES = 3;
@@ -161,7 +163,7 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
 
   // Compact record of every call, for the steps view. Holds no bodies and no values.
   (store.calls ??= []).push({
-    n: (store.callSeq = (store.callSeq ?? 0) + 1), at: Date.now(), step: store.steps?.length ? store.steps.length - 1 : null,
+    n: (store.callSeq = (store.callSeq ?? 0) + 1), at: Date.now(), s: Date.now() - Math.round(entry.timeMs ?? 0), step: store.steps?.length ? store.steps.length - 1 : null,
     key, status: entry.status, timeMs: Math.round(entry.timeMs ?? 0), size: entry.size, type: entry.type,
   });
   if (store.calls.length > MAX_CALLS) store.calls.splice(0, store.calls.length - MAX_CALLS);
@@ -240,7 +242,7 @@ function indexValues(store, key, leaves) {
     const v = producedValue(path, value);
     if (v === null) continue;
     delete index[`v:${v}`]; // re-insert so the newest producer is last
-    index[`v:${v}`] = { key, path };
+    index[`v:${v}`] = { key, path, n: store.callSeq };
   }
   const keys = Object.keys(index);
   if (keys.length > MAX_INDEX) for (const k of keys.slice(0, keys.length - MAX_INDEX)) delete index[k];
@@ -262,8 +264,9 @@ function linkChains(store, key, url, queryLeaves, bodyLeaves) {
     const from = v === null ? undefined : index[`v:${v}`];
     if (!from || from.key === key) continue;
     const id = `${from.key} ${from.path} -> ${key} ${where}`;
-    const chain = ((store.chains ??= {})[id] ??= { from, to: { key, where }, count: 0, example: v.slice(0, 40) });
+    const chain = ((store.chains ??= {})[id] ??= { from, to: { key, where }, count: 0, example: v.slice(0, 40), pairs: [] });
     chain.count++;
+    if (from.n !== undefined && (chain.pairs ??= []).length < 30) chain.pairs.push([from.n, store.callSeq]);
   }
 }
 
@@ -311,30 +314,29 @@ function table(node) {
   return out;
 }
 
-export const endpointLabel = (ep) => `${ep.method} ${ep.host}${ep.path}${ep.rpc ? ` [${ep.rpc}]` : ''}`;
-export const isApiCall = (c) => !c.type || c.type === 'XHR' || c.type === 'Fetch';
-
-/** The recorded calls grouped by the steps the user marked. [] when no step was marked. */
-export function groupSteps(store) {
-  const steps = store.steps ?? [];
-  if (!steps.length) return [];
-  const calls = store.calls ?? [];
-  const groups = steps.map((s, i) => ({ index: i, label: s.label, at: s.at, calls: calls.filter((c) => c.step === i) }));
-  const before = calls.filter((c) => c.step === null || c.step === undefined);
-  if (before.length) groups.unshift({ index: null, label: 'Before the first step', at: null, calls: before });
-  return groups;
-}
-
 function stepsMarkdown(store, only) {
-  const groups = groupSteps(store);
+  const manual = (store.steps?.length ?? 0) > 0;
+  const groups = getSteps(store);
   if (!groups.length) return [];
-  const lines = ['# Steps', '', 'The API calls made after each step you marked.', ''];
-  for (const g of groups) {
+  const flow = describeFlow(store, groups, only);
+  const lines = ['# Steps', '', manual
+    ? 'The API calls made after each step you marked.'
+    : 'Steps detected automatically: a pause in the API traffic or a page navigation starts a new step.', ''];
+  for (const { group: g, needs, inner, gives } of flow) {
     lines.push(`## ${g.index === null ? g.label : `Step ${g.index + 1}: ${g.label}`}`, '');
     const perKey = new Map();
     for (const c of g.calls.filter(isApiCall)) if (store.endpoints[c.key] && (!only || only.includes(c.key))) perKey.set(c.key, (perKey.get(c.key) ?? 0) + 1);
     if (!perKey.size) lines.push('- (no API calls)');
     for (const [key, n] of perKey) lines.push(`- ${endpointLabel(store.endpoints[key])}${n > 1 ? ` x${n}` : ''}`);
+    lines.push('');
+    if (needs.length) lines.push('Needs:', ...needs.map((e) => `- ${flowSentence(store, 'needs', e)}`), '');
+    if (inner.length) lines.push('Within this step:', ...inner.map((e) => `- ${flowSentence(store, 'inner', e)}`), '');
+    if (gives.length) lines.push('Passes on:', ...gives.map((e) => `- ${flowSentence(store, 'gives', e)}`), '');
+  }
+  const polling = [...detectPolling(store)].filter(([key]) => store.endpoints[key] && (!only || only.includes(key)));
+  if (polling.length) {
+    lines.push('## Background calls', '', 'Called again and again at a regular interval, so left out of the steps.', '');
+    for (const [key, p] of polling) lines.push(`- ${endpointLabel(store.endpoints[key])} about every ${Math.round(p.intervalMs / 1000)} s (${p.count} calls)`);
     lines.push('');
   }
   return lines;

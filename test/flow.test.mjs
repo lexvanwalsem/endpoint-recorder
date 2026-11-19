@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, createStore, groupSteps, markStep, toMarkdown } from '../recorder.mjs';
+import { addEntry, createStore, markStep, toMarkdown } from '../recorder.mjs';
+import { groupSteps } from '../flow.mjs';
 
 const call = (method, url, res, extra = {}) => ({ method, url, status: 200, timeMs: 10, type: 'Fetch', resMime: 'application/json', resText: res === undefined ? undefined : JSON.stringify(res), ...extra });
 const on = { keepExamples: true };

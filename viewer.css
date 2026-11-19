@@ -168,3 +168,21 @@ header::before {
   pointer-events: none;
 }
 .empty { background: var(--topo-soft) 50% 100% / 900px 360px repeat-x; padding-bottom: 96px; }
+
+/* Flow overview and the route between steps */
+.steps-mode #list .item:not(.route)::after { display: none; }
+.srcbar { padding: 2px 4px 10px; }
+.arrow { min-width: 78px; }
+.ovstep { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px 10px; margin: 0 0 12px; box-shadow: var(--shadow); }
+.ovhead { display: flex; gap: 10px; align-items: center; font-size: 17px; cursor: pointer; }
+.ovcalls { margin: 4px 0 8px; font-size: 13px; overflow-wrap: anywhere; }
+
+/* A little contour at the top of the content, fading out */
+#right { position: relative; }
+#right > * { position: relative; }
+#right::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 150px;
+  background: var(--topo-soft) 0 0 / 900px 360px repeat;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent); mask-image: linear-gradient(to bottom, #000, transparent);
+  pointer-events: none;
+}

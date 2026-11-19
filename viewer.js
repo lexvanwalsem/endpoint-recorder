@@ -1,11 +1,12 @@
 // Full page view of the recording: search, filter, sort, per-endpoint detail and export.
-import { createStore, endpointLabel, flatten, formatBytes, groupSteps, isApiCall, toMarkdown } from './recorder.mjs';
+import { createStore, flatten, formatBytes, toMarkdown } from './recorder.mjs';
+import { describeFlow, detectPolling, endpointLabel, getSteps, isApiCall } from './flow.mjs';
 
 const $ = (id) => document.getElementById(id);
 const MAX_ROWS = 1000;
 
 let store = createStore();
-const state = { q: '', method: '', host: '', type: '', sort: 'count', errorsOnly: false, withBody: false, selected: null, side: 'sample', sample: 0, fieldQ: '', mode: 'endpoints', step: undefined, apiOnly: true };
+const state = { q: '', method: '', host: '', type: '', sort: 'count', errorsOnly: false, withBody: false, selected: null, side: 'sample', sample: 0, fieldQ: '', mode: 'endpoints', step: undefined, stepSource: undefined, apiOnly: true };
 
 function h(tag, props = {}, ...kids) {
   const el = document.createElement(tag);
@@ -139,40 +140,106 @@ function flowBlock(ep) {
     outputs.map((c) => h('div', { class: 'flowrow' }, h('span', { class: 'arrow' }, 'out'), code(c.from.path), ' is used in ', link(c.to.key), ' ', code(c.to.where), note(c))));
 }
 
+const shortEndpoint = (ep) => `${ep.method} ${ep.path}${ep.rpc ? ` ${ep.rpc}` : ''}`;
+const stepMarker = (g) => h('span', { class: g.index === null ? 'wp wp-start' : 'wp' }, g.index === null ? '' : String(g.index + 1));
+const stepTitle = (g) => (g.index === null ? g.label : `Step ${g.index + 1}: ${g.label}`);
+
+/** One value travelling between calls, as a row with links to the endpoints and steps involved. kind: 'needs' | 'inner' | 'gives'. */
+function flowRow(kind, e) {
+  const link = (key) => h('span', { class: 'link', onclick: () => jumpTo(key) }, shortEndpoint(store.endpoints[key]));
+  const stepLink = (idx) => h('span', { class: 'link', onclick: () => { state.step = idx; render(); } }, idx === null ? 'the start' : `step ${idx + 1}`);
+  const code = (t) => h('code', { class: 'mono' }, t);
+  const note = h('span', { class: 'muted' }, ` e.g. ${e.example}, ${e.count}x`);
+  if (kind === 'needs') return h('div', { class: 'flowrow' }, h('span', { class: 'arrow' }, 'needs'), code(e.to.where), ' of ', link(e.to.key), ' comes from ', stepLink(e.fromStep), ': ', link(e.from.key), ' returns ', code(e.from.path), note);
+  if (kind === 'gives') return h('div', { class: 'flowrow' }, h('span', { class: 'arrow' }, 'passes on'), code(e.from.path), ' of ', link(e.from.key), ' is used in ', stepLink(e.toStep), ': ', link(e.to.key), ' (', e.to.where, ')', note);
+  return h('div', { class: 'flowrow' }, h('span', { class: 'arrow' }, 'within'), link(e.from.key), ' returns ', code(e.from.path), ', used in ', link(e.to.key), ' (', e.to.where, ')', note);
+}
+
+const flowRows = (f) => [...f.needs.map((e) => flowRow('needs', e)), ...f.inner.map((e) => flowRow('inner', e)), ...f.gives.map((e) => flowRow('gives', e))];
+
 function renderStepList() {
-  const groups = groupSteps(store);
   const list = $('list');
-  if (!groups.length) {
+  const groups = getSteps(store, state.stepSource);
+  const polling = [...detectPolling(store)].filter(([key]) => store.endpoints[key]);
+  const manual = (store.steps?.length ?? 0) > 0;
+  if (!groups.length && !polling.length) {
     list.replaceChildren(h('div', { class: 'empty' },
       h('div', { class: 'big' }, 'No steps yet'),
-      'While recording, type what you are about to do in the extension popup and press "Mark step". Calls are then grouped per step.'));
+      'Surveyor finds steps by itself: a pause in the traffic or a page change starts a new one. You can also mark them yourself in the popup.'));
     return;
   }
-  if (!groups.some((g) => g.index === state.step)) state.step = groups[groups.length - 1].index; // newest step
-  list.replaceChildren(...groups.map((g) => h('div', {
-    class: `item${g.index === state.step ? ' selected' : ''}`,
-    onclick: () => { state.step = g.index; render(); },
-  },
-  h('div', { class: 'top' }, h('span', { class: g.index === null ? 'wp wp-start' : 'wp' }, g.index === null ? '' : String(g.index + 1)), h('span', { class: 'path' }, g.label)),
-  h('div', { class: 'meta' }, `${plural(g.calls.filter(isApiCall).length, 'API call')}${g.at ? ` · ${new Date(g.at).toLocaleTimeString()}` : ''}`))));
+  if (state.step !== 'overview' && state.step !== 'background' && !groups.some((g) => g.index === state.step)) state.step = 'overview';
+
+  const source = state.stepSource ?? (manual ? 'manual' : 'auto');
+  const toggle = manual ? h('div', { class: 'srcbar' }, h('div', { class: 'seg' },
+    [['manual', 'Marked by you'], ['auto', 'Detected']].map(([id, label]) => h('button', {
+      class: source === id ? 'active' : '', onclick: () => { state.stepSource = id; render(); },
+    }, label)))) : null;
+
+  const item = (id, extraClass, top, meta) => h('div', { class: `item${id === state.step ? ' selected' : ''}${extraClass}`, onclick: () => { state.step = id; render(); } },
+    h('div', { class: 'top' }, ...top), h('div', { class: 'meta' }, meta));
+
+  const overview = groups.length ? item('overview', '', [h('span', { class: 'path' }, 'Flow overview')], `${plural(groups.length, 'step')} and how they connect`) : null;
+  const steps = groups.map((g, i) => item(g.index, i < groups.length - 1 ? ' route' : '', [stepMarker(g), h('span', { class: 'path' }, g.label)],
+    `${plural(g.calls.filter(isApiCall).length, 'API call')}${g.at ? ` · ${new Date(g.at).toLocaleTimeString()}` : ''}${g.auto ? ' · detected' : ''}`));
+  const background = polling.length ? item('background', '', [h('span', { class: 'path' }, 'Background calls')], `${plural(polling.length, 'endpoint')} repeated at a regular interval`) : null;
+  list.replaceChildren(...[toggle, overview, ...steps, background].filter(Boolean));
+}
+
+function renderOverview(right, groups) {
+  const flow = describeFlow(store, groups);
+  const auto = groups.some((g) => g.auto);
+  right.replaceChildren(h('div', { class: 'detail' },
+    h('div', { class: 'title' }, h('h2', {}, 'Flow overview')),
+    h('div', { class: 'sub muted' }, `${plural(groups.length, 'step')}${auto ? ', detected automatically from pauses and page changes' : ', marked by you'}. For each step: what it needs from earlier steps and what it passes on.`),
+    flow.map((f) => {
+      const keys = [...new Set(f.group.calls.map((c) => c.key))].filter((k) => store.endpoints[k]);
+      const shown = keys.slice(0, 6).map((k) => shortEndpoint(store.endpoints[k])).join('  ·  ');
+      return h('div', { class: 'ovstep' },
+        h('div', { class: 'ovhead', onclick: () => { state.step = f.group.index; render(); } }, stepMarker(f.group), h('b', {}, f.group.label)),
+        h('div', { class: 'ovcalls mono muted' }, shown + (keys.length > 6 ? `  ·  +${keys.length - 6} more` : '')),
+        flowRows(f).length ? flowRows(f) : h('div', { class: 'muted' }, 'No values from other steps were recognised here.'));
+    })));
+}
+
+function renderBackground(right) {
+  const polling = [...detectPolling(store)].filter(([key]) => store.endpoints[key]);
+  right.replaceChildren(h('div', { class: 'detail' },
+    h('div', { class: 'title' }, h('h2', {}, 'Background calls')),
+    h('div', { class: 'sub muted' }, 'These endpoints are called again and again at a regular interval. They are left out of the steps.'),
+    h('div', { class: 'panel' }, h('div', { class: 'tablewrap' }, h('table', {},
+      h('thead', {}, h('tr', {}, ['Call', 'Interval', 'Calls'].map((t) => h('th', {}, t)))),
+      h('tbody', {}, polling.map(([key, p]) => {
+        const ep = store.endpoints[key];
+        return h('tr', {},
+          h('td', {}, h('span', { class: `mpill ${ep.method}` }, ep.method), ' ', h('span', { class: 'link mono', onclick: () => jumpTo(key) }, ep.path + (ep.rpc ? ` ${ep.rpc}` : '')), h('div', { class: 'muted' }, ep.host)),
+          h('td', {}, `about every ${Math.round(p.intervalMs / 1000)} s`),
+          h('td', {}, String(p.count)));
+      })))))));
 }
 
 function renderStepDetail() {
   const right = $('right');
-  const g = groupSteps(store).find((x) => x.index === state.step);
-  if (!g) { right.replaceChildren(h('div', { class: 'empty' })); return; }
+  const groups = getSteps(store, state.stepSource);
+  if (state.step === 'overview' && groups.length) return renderOverview(right, groups);
+  if (state.step === 'background') return renderBackground(right);
+  const flow = describeFlow(store, groups).find((f) => f.group.index === state.step);
+  if (!flow) { right.replaceChildren(h('div', { class: 'empty' })); return; }
+  const g = flow.group;
   const calls = g.calls.filter((c) => (!state.apiOnly || isApiCall(c)) && store.endpoints[c.key]);
   const t0 = g.at ? Date.parse(g.at) : (g.calls[0]?.at ?? 0);
+  const rows = flowRows(flow);
   right.replaceChildren(h('div', { class: 'detail' },
-    h('div', { class: 'title' }, h('span', { class: g.index === null ? 'wp wp-start' : 'wp' }, g.index === null ? '' : String(g.index + 1)), h('h2', {}, g.index === null ? g.label : g.label)),
-    h('div', { class: 'sub muted' }, `${g.at ? `${time(g.at)} · ` : ''}${plural(calls.length, 'call')} shown`),
+    h('div', { class: 'title' }, stepMarker(g), h('h2', {}, g.label)),
+    h('div', { class: 'sub muted' }, `${g.at ? `${time(g.at)} · ` : ''}${plural(calls.length, 'call')} shown${g.auto ? ' · detected automatically' : ''}`),
+    rows.length ? h('div', { class: 'flow' }, h('div', { class: 'label' }, 'Flow'), rows) : null,
     h('div', { class: 'tools' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.apiOnly, onchange: (e) => { state.apiOnly = e.target.checked; render(); } }), ' API calls only (XHR and fetch)')),
     h('div', { class: 'panel' }, h('div', { class: 'tablewrap' }, h('table', {},
       h('thead', {}, h('tr', {}, ['Time', 'Call', 'Status', 'Duration', 'Size', 'Type'].map((t) => h('th', {}, t)))),
       h('tbody', {}, calls.map((c) => {
         const ep = store.endpoints[c.key];
         return h('tr', {},
-          h('td', { class: 'mono' }, `+${Math.max(0, (c.at - t0) / 1000).toFixed(1)} s`),
+          h('td', { class: 'mono' }, `+${Math.max(0, ((c.s ?? c.at) - t0) / 1000).toFixed(1)} s`),
           h('td', {}, h('span', { class: `mpill ${ep.method}` }, ep.method), ' ', h('span', { class: 'link mono', onclick: () => jumpTo(c.key) }, ep.path + (ep.rpc ? ` ${ep.rpc}` : '')), h('div', { class: 'muted' }, ep.host)),
           h('td', {}, h('span', { class: `pill ${c.status >= 400 ? 'err' : 'ok'}` }, String(c.status))),
           h('td', {}, `${c.timeMs} ms`),
@@ -180,7 +247,6 @@ function renderStepDetail() {
           h('td', {}, c.type || '-'));
       })))))));
 }
-
 
 function fieldTable(node, term) {
   const t = term.trim().toLowerCase();

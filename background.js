@@ -1,4 +1,5 @@
 import { addEntry, createStore, markStep } from './recorder.mjs';
+import { addNav } from './flow.mjs';
 import { createCapture } from './capture.mjs';
 
 // The worker can be stopped at any time. The recording lives in chrome.storage.local, the list of tabs being
@@ -37,9 +38,25 @@ const capture = createCapture({
   }),
 });
 
+// A page load or a route change inside a single page app starts a new step.
+const recordNav = (url) => /^https?:/.test(url) && enqueue(async () => {
+  const { store } = await load();
+  addNav(store, { url });
+  await chrome.storage.local.set({ store });
+});
+
 chrome.debugger.onEvent.addListener(async (source, method, params) => {
   await settingsReady;
-  if (source.tabId !== undefined && (await recordingTabs()).includes(source.tabId)) capture.handle(source.tabId, method, params);
+  if (source.tabId === undefined || !(await recordingTabs()).includes(source.tabId)) return;
+  if (method === 'Page.frameNavigated') {
+    if (!params.frame.parentId) recordNav(params.frame.url); // main frame only, not iframes
+    return;
+  }
+  if (method === 'Page.navigatedWithinDocument') {
+    recordNav(params.url);
+    return;
+  }
+  capture.handle(source.tabId, method, params);
 });
 
 // Forget a tab: used when the debugger detaches (bar closed, tab closed) and when the user presses stop.
@@ -66,6 +83,7 @@ function showBadge(tabId) {
 async function start(tabId) {
   await chrome.debugger.attach({ tabId }, '1.3');
   await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
+  await chrome.debugger.sendCommand({ tabId }, 'Page.enable'); // page and route changes, to detect steps
   await setRecordingTabs([...new Set([...(await recordingTabs()), tabId])]);
   showBadge(tabId);
 }

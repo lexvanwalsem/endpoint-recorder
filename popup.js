@@ -25,7 +25,7 @@ async function render() {
   // marking steps only makes sense while recording
   $('stepBox').hidden = !recording;
   const steps = store.steps ?? [];
-  $('stepNow').textContent = steps.length ? `Current step ${steps.length}: ${steps.at(-1).label}` : 'Calls are grouped under the step you mark. Mark one before you click.';
+  $('stepNow').textContent = steps.length ? `Current step ${steps.length}: ${steps.at(-1).label}` : 'Steps are detected automatically. Mark one yourself to give it your own name.';
   return recording;
 }
 
