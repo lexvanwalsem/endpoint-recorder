@@ -136,3 +136,19 @@ header { background: var(--surface) var(--topo) right center / auto 140% no-repe
 .item .top .wp { align-self: center; }
 #right { background: var(--bg) var(--topo-soft) right top / 1100px auto no-repeat; }
 header { background-size: auto 220%; }
+
+/* One seamless contour pattern everywhere, no marker bar on the selected item, a calm hint box */
+header { background: var(--surface) var(--topo) 0 0 / 900px 360px repeat; }
+#left { background: var(--surface) var(--topo-soft) 0 0 / 900px 360px repeat; }
+#right { background: var(--bg) var(--topo-soft) 0 0 / 900px 360px repeat; }
+.empty { background: none; padding-bottom: 56px; }
+.item.selected { box-shadow: none; }
+.hint { background: var(--panel); color: var(--muted); border: 1px dashed var(--line); }
+
+/* Steps are waypoints on a dashed route */
+.wp-start { min-width: 26px; height: 26px; }
+.steps-mode #list .item { position: relative; }
+.steps-mode #list .item:not(:last-child)::after {
+  content: ''; position: absolute; left: 24px; top: 35px; height: calc(100% - 23px);
+  border-left: 2px dashed color-mix(in srgb, var(--amber) 75%, transparent); pointer-events: none;
+}
