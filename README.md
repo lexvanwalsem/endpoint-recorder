@@ -5,55 +5,108 @@
 <h1 align="center">Endpoint Recorder</h1>
 
 <p align="center">
-  See how a web app talks to its backend.<br>
-  Record the network calls of one browser tab and get a searchable map of endpoints, fields and real example responses.
+  <b>Understand how any web app really works, in one click-through.</b><br>
+  Record the network calls of a browser tab and get a searchable map of every endpoint, field, example response,
+  step and data dependency. No documentation needed.
 </p>
 
 <p align="center">
   <a href="https://github.com/lexvanwalsem/endpoint-recorder/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/lexvanwalsem/endpoint-recorder/actions/workflows/test.yml/badge.svg"></a>
   <img alt="Chrome extension, Manifest V3" src="https://img.shields.io/badge/Chrome-Manifest%20V3-0d7c75">
   <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-0d7c75">
+  <img alt="Local only" src="https://img.shields.io/badge/data-stays%20on%20your%20computer-0d7c75">
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-0d7c75">
 </p>
 
 <p align="center">
-  <img src="docs/full-view.png" alt="The full view: endpoint list on the left, details with a real example call on the right" width="900">
+  <img src="docs/full-view.png" alt="Search for a value and see which endpoint and field returned it, plus where the data flows" width="900">
 </p>
 
-## Why
+## What it does
 
-Most systems you integrate with do not come with good API documentation. Their web interface, however, already calls
-the API for everything it shows. Endpoint Recorder watches those calls while you click through the interface and turns
-them into documentation: which endpoints exist, what you send, what you get back, how often, how fast and how big.
+You use the web app as you normally would. Endpoint Recorder watches the calls the page makes to its backend and turns
+them into something you can read, search and share:
 
-Typical uses: figuring out an undocumented API, planning an integration, checking what a page really loads, comparing
-what a system returns with what its documentation promises.
+- **Every endpoint on one screen**, grouped and named, with timing, size and status.
+- **Every field** of every request and response, with its type and how often it appears.
+- **Real example calls**: the full URL, what was sent, what came back, as formatted JSON.
+- **The story of what you did**: the calls grouped per step ("open the ticket", "reply", "close").
+- **The links between calls**: this id came from that response.
 
-## Features
+It works on any site, on a tab that is already open, without a proxy, certificates, command line or account.
 
-- **Find where a value comes from.** Type something you see on screen, a name, an order number, an amount. The search
-  lists the endpoints that returned it, with the exact field (`$.items[].customer.name`) and the value, and opens that field.
-- **Steps.** Mark what you are about to do ("open the ticket", "close it") while you record. The calls are then grouped per
-  step, so you see which endpoints one action in the interface triggers.
-- **Data flow.** When a value returned by one call (an id, a token) is used again in a later call, the link is shown:
-  `POST /tickets/{id}/close` takes its `id` from `GET /tickets`, `$.items[].id`.
-- **One tab at a time.** Switch it on for a tab from the toolbar icon; nothing else is watched.
-- **Every kind of response.** JSON and form data are broken down into fields. HTML, XML and plain text are kept as text.
-  Binary files and oversized responses are listed with their type and size.
-- **Real example calls.** The full URL with query values, what was sent and what came back, as readable formatted JSON.
-- **Field structure.** Per endpoint every field with its type(s) and how often it is present, so optional fields stand out.
-- **Smart grouping.** Ids in paths become `{id}`. Calls that share one URL, such as JSON-RPC (Odoo) and GraphQL, are
-  split by what they call (`mail.message.search_read`, the operation name).
-- **Search and filter.** Search across paths, hosts, field names and the example data itself. Filter on method, host,
-  request type and errors. Sort on calls, speed or recency.
-- **Timing and size.** Average and slowest time, average and largest transfer size, status codes, content types.
-- **Export.** Markdown for reading and sharing, JSON for processing. The export follows your filters.
-- **Every request, every host.** API calls are recorded together with pages, scripts, styles, images and fonts, and with
-  calls to other domains (analytics, CDNs, other services). Filter by type or host in the full view.
-- **Light and dark.** Follows your browser theme.
+## Why use it
+
+Most systems have an interface that works and documentation that does not. The interface already calls the API for
+everything it shows, but that knowledge is hidden in a long list of requests. This is what changes:
+
+| You want to know | Without | With Endpoint Recorder |
+|---|---|---|
+| Where does this number on screen come from? | Open request after request in the Network tab until you spot it | Type the number. The endpoints that returned it are listed with the exact field, and the field opens |
+| What does clicking "Close ticket" trigger? | Clear the log, click, read the new rows, remember them | Mark a step, click. The step lists exactly its calls, in order |
+| Which endpoints exist? | A list where `/orders/1001` and `/orders/1002` are separate rows | One row per endpoint, ids become `{id}`, JSON-RPC and GraphQL are split by what they call |
+| Which fields can be missing? | Compare several responses by hand | Every field shows its type and how often it is present |
+| How do calls depend on each other? | Notice an id in one response and recognise it in a later URL | Shown as data flow: `POST /tickets/{id}/close` takes its `id` from `GET /tickets` |
+| What does an endpoint return? | Open one request at a time and switch to the response | Example calls per endpoint, with the URL, query values and formatted JSON |
+| Keep the result | Lost when DevTools closes or the log is cleared | Kept in the browser, exported as Markdown or JSON |
+| Share it with a colleague | Send a HAR file: a raw dump with every request | A readable report per endpoint, filtered to what matters |
+| Know what a page sends to third parties | Scroll for other hostnames | Every host is recorded and can be filtered |
+
+It is not a replacement for Chrome DevTools. It is what you reach for when the question is "how does this system work",
+instead of "why did this one request fail".
+
+### Good for
+
+- **Planning an integration** with a system that has poor or no API documentation.
+- **Documenting a legacy system** while you click through it.
+- **Bug reports and QA**: attach the exact steps and calls instead of a screenshot.
+- **Analysts and support**: find out which service a figure on a dashboard really comes from.
+- **Vendor evaluation and migration**: see what a product's own interface depends on.
+- **Security and privacy reviews**: see which hosts a page talks to and what it sends them.
+- **Onboarding**: give a new developer a map of a system on their first day.
+
+## What you get
+
+### Find where a value comes from
+
+Type a name, an order number or an amount you see on screen. Every endpoint that returned or received it is listed with
+the field and the value, for example `RECEIVED $.items[].customer.name = Fleur Meijer`. Click it and the field opens.
+
+### Follow what an action triggers
+
+Type what you are about to do and press **Mark step**. The **Steps** view then shows the calls of each step in order,
+with time since the step, status, duration and size. Click a call to jump to its endpoint.
 
 <p align="center">
   <img src="docs/steps.png" alt="Steps view: the calls made after each step you marked" width="900">
 </p>
+
+### See how calls depend on each other
+
+When a value returned by one call (an id, a token, a code) is used again in a later path, query string or body, the link
+is shown on both endpoints: where a value comes from and where it goes. That is the sequence you need to reproduce a
+workflow.
+
+### Understand the data
+
+Per endpoint every request and response field with its type, how often it is present (so optional fields stand out) and
+examples. JSON and form data are broken down into fields. HTML, XML and plain text are kept as text. Binary files and very
+large responses are listed with their type and size.
+
+### Read the real thing
+
+Example calls show the full URL including query values, what was sent and what came back, as colour-coded formatted
+JSON with a copy button.
+
+### Find the problems
+
+Errors are flagged with a count. Average and slowest time and the transfer size are shown per endpoint. You can filter on
+errors, method, host and request type, and sort on calls, speed or recency.
+
+### Take it with you
+
+**Export Markdown** gives a readable report (endpoints, steps, data flow, examples) to read, share or paste into a ticket.
+**Export JSON** gives the data for other tools. Both follow your current filters.
 
 <p align="center">
   <img src="docs/popup.png" alt="The toolbar popup while recording, with the field to mark a step" width="300">
@@ -61,7 +114,7 @@ what a system returns with what its documentation promises.
 
 ## Install
 
-The extension is not in the Chrome Web Store. Load it as an unpacked extension:
+The extension is not in the Chrome Web Store. Load it as an unpacked extension (takes a minute):
 
 1. Download or clone this repository.
 2. Open `chrome://extensions` and switch on **Developer mode**.
@@ -77,27 +130,11 @@ After changing the code, press the refresh icon on the extension card.
    Leave it open: closing it stops the recording.
 3. Before each thing you do, type a short description in the step field and press **Mark step**
    ("open the ticket", "reply", "close"). This is optional, but it makes the result much easier to read.
-4. Use the app as you normally would: open a ticket, reply to a mail, run a report. Press **Reload tab** if you also
-   want the calls made while the page loads.
+4. Use the app as you normally would. Press **Reload tab** if you also want the calls made while the page loads.
 5. Click **Open full view** to search, filter and inspect. Switch between **Endpoints** and **Steps** at the top left.
    **Export Markdown** or **Export JSON** takes the result with you.
 
-## Find a value, follow a step, follow the data
-
-- **Search by what you see.** Type a value in the search box. Every endpoint that returned or received it is listed
-  with a line like `RECEIVED $.items[].customer.name = Fleur Meijer`. Click it to open that field.
-  Per endpoint up to 200 distinct values are remembered (the first 20 items of each list, texts up to 120 characters).
-- **Steps view.** Pick a step to see its calls in order with the time since the step was marked, status, duration and size.
-  Click a call to jump to its endpoint. By default only API calls (XHR and fetch) are shown.
-- **Data flow.** A value counts as an identifier when it is a token or code (6 to 100 characters without spaces, with a
-  digit or at least 16 characters), or a number of 10 or more in a field named like `id`, `token`, `key` or `code`.
-  When such a value shows up later in a path, query string or body of a different endpoint, the link is recorded. The
-  newest call that returned the value is taken as its source. Links are a strong hint, not proof: always check them.
-  Request headers are not read, so tokens sent in headers are not followed.
-
-## What you get
-
-A Markdown export looks like this (shortened):
+## A Markdown export looks like this
 
 ````markdown
 ## POST shop.example.com/web/dataset/call_kw/mail.message/search_read [mail.message.search_read]
@@ -124,22 +161,26 @@ Response fields
 | $.result[].author_id | array | 100% | |
 ````
 
-The Markdown export also contains a **Steps** section (the API calls per step) and a **Data flow** section.
+The export starts with a **Steps** section and a **Data flow** section when you used them.
 
-## Privacy and safety
+## Built to be trusted
 
-- **Everything stays on your computer.** The extension has no server, sends nothing anywhere and has no analytics.
-  The recording lives in `chrome.storage.local` until you press **Clear** or remove the extension.
-- **Request headers are not read**, with one exception: `Content-Type`, to know how to read a body. Cookies,
-  authorization headers and tokens never enter the recording.
-- **Values are remembered when example data is on.** The search and the data flow use the values seen in bodies and query
-  strings. Like the example calls, they stay on your computer and are removed with **Clear**. With **Keep example data**
-  off, no values are kept: you still get steps, fields and timing, but not value search or data flow.
-- **Example data is on by default.** The latest three calls per endpoint are stored with their URL (including query
-  values) and a shortened body, so you can see what an endpoint returns. That can contain personal data or secrets that
-  appear in URLs or bodies. Untick **Keep example data** under Options in the popup to keep only field names and types.
-- **Treat exports like the data they come from.** Do not commit them or share them if they hold customer data.
-- **Record only systems you are allowed to look into**, and respect their terms of use.
+- **Everything stays on your computer.** No server, no account, no analytics, no network requests of its own.
+- **Request headers are not stored.** The only header it looks at is `Content-Type`, to know how to read a body.
+  Cookies, authorization headers and tokens never enter the recording.
+- **You decide what is kept.** With **Keep example data** off, only field names and types are kept.
+- **No dependencies and small enough to read.** About a thousand lines of plain JavaScript, no build step, no packages
+  to trust. You can review all of it in an afternoon.
+- **Tested.** 30 automated tests run on every change.
+- **Open source** under the MIT license.
+
+### Privacy details
+
+- The recording lives in `chrome.storage.local` until you press **Clear** or remove the extension.
+- Example data and remembered values (for search and data flow) can contain personal data or secrets that appear in URLs
+  and bodies. They are shortened, and they stay local. Treat exports like the data they come from: do not commit or share
+  them if they hold customer data.
+- Record only systems you are allowed to look into, and respect their terms of use.
 
 ### Why these permissions
 
@@ -156,19 +197,31 @@ There are no host permissions and no code runs inside the pages you visit.
 
 The extension attaches the Chrome debugger to the tab and listens to its Network events. For each finished call it
 collects method, URL, status, timing and size, and asks for the response body. `capture.mjs` turns the events into
-calls, `recorder.mjs` groups them per endpoint, infers the field structure and keeps the examples. `viewer.html` shows
-the result, `popup.html` controls the recording.
+calls, `recorder.mjs` groups them per endpoint, infers the field structure, keeps the examples and finds the links
+between calls. `viewer.html` shows the result, `popup.html` controls the recording.
+
+How an identifier is recognised for the data flow: a token or code (6 to 100 characters without spaces, with a digit or at
+least 16 characters), or a number of 10 or more in a field named like `id`, `token`, `key` or `code`. Links are a strong
+hint, not proof: check them. The newest call that returned a value is taken as its source.
 
 ## Limits
 
 - WebSocket and Server-Sent Events traffic is not captured.
+- Request headers are not read, so tokens sent in headers are not followed in the data flow.
 - Bodies are read up to 50 MB; larger responses are listed with their size but without content.
 - Binary bodies (images, PDF, archives) are not shown, only their type and size.
 - Multipart uploads are listed, but their parts are not broken down.
 - Example calls are shortened: the first 3 items of lists, texts cut at 200 characters (4000 for text bodies),
-  60 keys per object and 8 levels deep. The field structure looks at the first 20 items of each list.
-- The call log keeps the last 5000 calls, the data flow remembers the last 3000 identifier values.
+  60 keys per object and 8 levels deep. The field structure and the value search look at the first 20 items of each list,
+  and remember up to 200 distinct values per endpoint.
+- The call log keeps the last 5000 calls and the data flow the last 3000 identifier values.
 - Chrome internal pages (`chrome://`) and the Chrome Web Store cannot be recorded.
+
+## Ideas
+
+Not promises, but where it could go next: export as an OpenAPI specification and TypeScript types, copy a call as cURL
+or fetch, compare two recordings, detect pagination and authentication, flag personal data in responses, record
+WebSockets, and open an export in the viewer without the extension. Issues and pull requests are welcome.
 
 ## Development
 
