@@ -2,17 +2,30 @@ import { addEntry, createStore, markStep } from './recorder.mjs';
 import { addNav } from './flow.mjs';
 import { createCapture } from './capture.mjs';
 
-// The worker can be stopped at any time. The recording lives in chrome.storage.local, the list of tabs being
-// recorded in chrome.storage.session (the debugger attachment itself stays alive while the worker sleeps).
-let queue = Promise.resolve();
-function enqueue(fn) {
-  const result = queue.then(fn);
-  queue = result.catch(() => {});
-  return result;
-}
+// The recording is kept in memory while the worker is awake and written to chrome.storage.local at most once per second.
+// Writing the whole recording after every network event made busy pages (hundreds of events) block the worker, and with
+// it the popup and the stop button. Messages from the popup never wait for those writes.
+const SAVE_DELAY_MS = 1000;
 
-const recordingTabs = async () => (await chrome.storage.session.get('tabs')).tabs ?? [];
-const setRecordingTabs = (tabs) => chrome.storage.session.set({ tabs });
+let storePromise = null;
+const getStore = () => (storePromise ??= chrome.storage.local.get('store').then(({ store }) => store ?? createStore()));
+
+let saveTimer;
+async function saveNow() {
+  clearTimeout(saveTimer);
+  if (storePromise) await chrome.storage.local.set({ store: await storePromise });
+}
+const scheduleSave = () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveNow().catch(() => {}); }, SAVE_DELAY_MS);
+};
+chrome.runtime.onSuspend.addListener(() => { saveNow().catch(() => {}); });
+
+// The tabs being recorded live in memory too, and in chrome.storage.session so they survive a restart of the worker
+// (the debugger attachment itself stays alive while the worker sleeps).
+let tabsPromise = null;
+const getTabs = () => (tabsPromise ??= chrome.storage.session.get('tabs').then(({ tabs }) => new Set(tabs ?? [])));
+const persistTabs = async () => chrome.storage.session.set({ tabs: [...(await getTabs())] });
 
 // Settings are cached because they are needed for every network event.
 let settings = { keepExamples: true };
@@ -21,33 +34,29 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.settings) settings = { keepExamples: true, ...changes.settings.newValue };
 });
 
-async function load() {
-  await settingsReady;
-  const { store } = await chrome.storage.local.get('store');
-  return { store: store ?? createStore(), keepExamples: settings.keepExamples };
-}
-
 const capture = createCapture({
   getBody: (tabId, requestId) => chrome.debugger.sendCommand({ tabId }, 'Network.getResponseBody', { requestId }),
   wantAll: () => true, // every request type, from every host the page talks to
-  onEntry: (entry) => enqueue(async () => {
+  onEntry: async (entry) => {
     if (!/^https?:/.test(entry.url)) return;
-    const { store, keepExamples } = await load();
-    addEntry(store, entry, { keepExamples });
-    await chrome.storage.local.set({ store });
-  }),
+    try {
+      const store = await getStore();
+      addEntry(store, entry, { keepExamples: settings.keepExamples });
+      scheduleSave();
+    } catch { /* one odd call must not stop the recording */ }
+  },
 });
 
 // A page load or a route change inside a single page app starts a new step.
-const recordNav = (url) => /^https?:/.test(url) && enqueue(async () => {
-  const { store } = await load();
-  addNav(store, { url });
-  await chrome.storage.local.set({ store });
-});
+async function recordNav(url) {
+  if (!/^https?:/.test(url)) return;
+  addNav(await getStore(), { url });
+  scheduleSave();
+}
 
 chrome.debugger.onEvent.addListener(async (source, method, params) => {
   await settingsReady;
-  if (source.tabId === undefined || !(await recordingTabs()).includes(source.tabId)) return;
+  if (source.tabId === undefined || !(await getTabs()).has(source.tabId)) return;
   if (method === 'Page.frameNavigated') {
     if (!params.frame.parentId) recordNav(params.frame.url); // main frame only, not iframes
     return;
@@ -62,8 +71,10 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
 // Forget a tab: used when the debugger detaches (bar closed, tab closed) and when the user presses stop.
 async function forget(tabId) {
   capture.dropTab(tabId);
-  await setRecordingTabs((await recordingTabs()).filter((id) => id !== tabId));
+  (await getTabs()).delete(tabId);
+  await persistTabs();
   chrome.action.setBadgeText({ tabId, text: '' }).catch(() => {});
+  await saveNow().catch(() => {}); // what was recorded so far is safe
 }
 
 chrome.debugger.onDetach.addListener((source) => {
@@ -72,7 +83,7 @@ chrome.debugger.onDetach.addListener((source) => {
 
 // Chrome clears a tab's badge on navigation: put it back.
 chrome.tabs.onUpdated.addListener(async (tabId) => {
-  if ((await recordingTabs()).includes(tabId)) showBadge(tabId);
+  if ((await getTabs()).has(tabId)) showBadge(tabId);
 });
 
 function showBadge(tabId) {
@@ -84,7 +95,8 @@ async function start(tabId) {
   await chrome.debugger.attach({ tabId }, '1.3');
   await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
   await chrome.debugger.sendCommand({ tabId }, 'Page.enable'); // page and route changes, to detect steps
-  await setRecordingTabs([...new Set([...(await recordingTabs()), tabId])]);
+  (await getTabs()).add(tabId);
+  await persistTabs();
   showBadge(tabId);
 }
 
@@ -95,8 +107,22 @@ async function stop(tabId) {
 
 async function handle(msg) {
   switch (msg.type) {
-    case 'get':
-      return { ...(await load()), recording: (await recordingTabs()).includes(msg.tabId) };
+    case 'status': { // light: what the popup needs, not the whole recording
+      await settingsReady;
+      const store = await getStore();
+      const eps = Object.values(store.endpoints);
+      return {
+        recording: (await getTabs()).has(msg.tabId),
+        keepExamples: settings.keepExamples,
+        endpoints: eps.length,
+        calls: eps.reduce((n, e) => n + e.count, 0),
+        stepCount: store.steps?.length ?? 0,
+        lastStep: store.steps?.at(-1)?.label ?? '',
+      };
+    }
+    case 'get': // the whole recording, for export
+      await settingsReady;
+      return { store: await getStore(), recording: (await getTabs()).has(msg.tabId), keepExamples: settings.keepExamples };
     case 'start':
       try {
         await start(msg.tabId);
@@ -108,13 +134,14 @@ async function handle(msg) {
       await stop(msg.tabId);
       return { ok: true };
     case 'mark': {
-      const { store } = await load();
+      const store = await getStore();
       const index = markStep(store, msg.label);
-      await chrome.storage.local.set({ store });
+      scheduleSave();
       return { ok: true, index, label: store.steps[index].label };
     }
     case 'clear':
-      await chrome.storage.local.set({ store: createStore() });
+      storePromise = Promise.resolve(createStore());
+      await saveNow();
       return null;
     case 'setSettings':
       await chrome.storage.local.set({ settings: { keepExamples: Boolean(msg.keepExamples) } });
@@ -125,6 +152,6 @@ async function handle(msg) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
-  enqueue(() => handle(msg)).then(respond, (err) => respond({ ok: false, error: err.message }));
+  handle(msg).then(respond, (err) => respond({ ok: false, error: err.message }));
   return true;
 });

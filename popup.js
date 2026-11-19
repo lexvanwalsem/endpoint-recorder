@@ -8,31 +8,46 @@ let host = '';
 try { host = new URL(tab.url).host; } catch { /* no usable tab */ }
 $('site').textContent = host || tab?.title || 'unknown tab';
 
+let isRecording = false;
+
+// Asks only for a light status (counts and the last step), never for the whole recording.
 async function render() {
-  const { store, recording, keepExamples } = await send({ type: 'get', tabId: tab.id });
-  const eps = Object.values(store.endpoints);
-  const calls = eps.reduce((s, e) => s + e.count, 0);
-  $('toggle').textContent = recording ? 'Stop recording' : 'Record this tab';
-  $('toggle').classList.toggle('primary', !recording);
-  if (document.activeElement !== $('examples')) $('examples').checked = keepExamples;
+  let s;
+  try {
+    s = await send({ type: 'status', tabId: tab.id });
+  } catch {
+    s = null;
+  }
+  if (!s) {
+    $('error').textContent = 'Surveyor does not answer. Reload the extension in chrome://extensions.';
+    return;
+  }
+  isRecording = s.recording;
+  $('toggle').textContent = s.recording ? 'Stop recording' : 'Record this tab';
+  $('toggle').classList.toggle('primary', !s.recording);
+  if (document.activeElement !== $('examples')) $('examples').checked = s.keepExamples;
 
   const line = document.createDocumentFragment();
-  if (recording) line.append(Object.assign(document.createElement('span'), { className: 'rec-dot' }));
-  line.append(`${recording ? 'Recording' : 'Not recording'}: ${eps.length} endpoints, ${calls} calls`);
-  $('state').className = `status${recording ? ' on' : ''}`;
+  if (s.recording) line.append(Object.assign(document.createElement('span'), { className: 'rec-dot' }));
+  line.append(`${s.recording ? 'Recording' : 'Not recording'}: ${s.endpoints} endpoints, ${s.calls} calls`);
+  $('state').className = `status${s.recording ? ' on' : ''}`;
   $('state').replaceChildren(line);
 
   // marking steps only makes sense while recording
-  $('stepBox').hidden = !recording;
-  const steps = store.steps ?? [];
-  $('stepNow').textContent = steps.length ? `Current step ${steps.length}: ${steps.at(-1).label}` : 'Steps are detected automatically. Mark one yourself to give it your own name.';
-  return recording;
+  $('stepBox').hidden = !s.recording;
+  $('stepNow').textContent = s.stepCount ? `Current step ${s.stepCount}: ${s.lastStep}` : 'Steps are detected automatically. Mark one yourself to give it your own name.';
 }
 
+// Start and stop do not wait for a status first, so stopping always works.
 $('toggle').onclick = async () => {
-  const recording = await render();
-  const result = await send({ type: recording ? 'stop' : 'start', tabId: tab.id });
-  $('error').textContent = result?.ok === false ? `Could not start: ${result.error}` : '';
+  const wasRecording = isRecording;
+  $('toggle').disabled = true;
+  try {
+    const result = await send({ type: wasRecording ? 'stop' : 'start', tabId: tab.id });
+    $('error').textContent = result?.ok === false ? `Could not ${wasRecording ? 'stop' : 'start'}: ${result.error}` : '';
+  } finally {
+    $('toggle').disabled = false;
+  }
   await render();
 };
 

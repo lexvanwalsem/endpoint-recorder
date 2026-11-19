@@ -451,7 +451,7 @@ $('exportJson').onclick = () => {
 };
 $('clear').onclick = async () => {
   if (!confirm('Delete the whole recording? Export it first if you still need it.')) return;
-  await chrome.storage.local.set({ store: createStore() });
+  await chrome.runtime.sendMessage({ type: 'clear' }); // the background worker owns the recording and writes it
 };
 
 chrome.storage.onChanged.addListener((changes, area) => {
