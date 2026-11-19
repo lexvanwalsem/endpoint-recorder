@@ -30,6 +30,12 @@ what a system returns with what its documentation promises.
 
 ## Features
 
+- **Find where a value comes from.** Type something you see on screen, a name, an order number, an amount. The search
+  lists the endpoints that returned it, with the exact field (`$.items[].customer.name`) and the value, and opens that field.
+- **Steps.** Mark what you are about to do ("open the ticket", "close it") while you record. The calls are then grouped per
+  step, so you see which endpoints one action in the interface triggers.
+- **Data flow.** When a value returned by one call (an id, a token) is used again in a later call, the link is shown:
+  `POST /tickets/{id}/close` takes its `id` from `GET /tickets`, `$.items[].id`.
 - **One tab at a time.** Switch it on for a tab from the toolbar icon; nothing else is watched.
 - **Every kind of response.** JSON and form data are broken down into fields. HTML, XML and plain text are kept as text.
   Binary files and oversized responses are listed with their type and size.
@@ -46,7 +52,11 @@ what a system returns with what its documentation promises.
 - **Light and dark.** Follows your browser theme.
 
 <p align="center">
-  <img src="docs/popup.png" alt="The toolbar popup while recording" width="260">
+  <img src="docs/steps.png" alt="Steps view: the calls made after each step you marked" width="900">
+</p>
+
+<p align="center">
+  <img src="docs/popup.png" alt="The toolbar popup while recording, with the field to mark a step" width="300">
 </p>
 
 ## Install
@@ -65,9 +75,25 @@ After changing the code, press the refresh icon on the extension card.
 1. Open the web app in a tab and click the extension icon.
 2. Press **Record this tab**. Chrome shows a bar saying "Endpoint Recorder started debugging this browser".
    Leave it open: closing it stops the recording.
-3. Use the app as you normally would: open a ticket, reply to a mail, run a report. Press **Reload tab** if you also
+3. Before each thing you do, type a short description in the step field and press **Mark step**
+   ("open the ticket", "reply", "close"). This is optional, but it makes the result much easier to read.
+4. Use the app as you normally would: open a ticket, reply to a mail, run a report. Press **Reload tab** if you also
    want the calls made while the page loads.
-4. Click **Open full view** to search, filter and inspect. **Export Markdown** or **Export JSON** to take it with you.
+5. Click **Open full view** to search, filter and inspect. Switch between **Endpoints** and **Steps** at the top left.
+   **Export Markdown** or **Export JSON** takes the result with you.
+
+## Find a value, follow a step, follow the data
+
+- **Search by what you see.** Type a value in the search box. Every endpoint that returned or received it is listed
+  with a line like `RECEIVED $.items[].customer.name = Fleur Meijer`. Click it to open that field.
+  Per endpoint up to 200 distinct values are remembered (the first 20 items of each list, texts up to 120 characters).
+- **Steps view.** Pick a step to see its calls in order with the time since the step was marked, status, duration and size.
+  Click a call to jump to its endpoint. By default only API calls (XHR and fetch) are shown.
+- **Data flow.** A value counts as an identifier when it is a token or code (6 to 100 characters without spaces, with a
+  digit or at least 16 characters), or a number of 10 or more in a field named like `id`, `token`, `key` or `code`.
+  When such a value shows up later in a path, query string or body of a different endpoint, the link is recorded. The
+  newest call that returned the value is taken as its source. Links are a strong hint, not proof: always check them.
+  Request headers are not read, so tokens sent in headers are not followed.
 
 ## What you get
 
@@ -98,12 +124,17 @@ Response fields
 | $.result[].author_id | array | 100% | |
 ````
 
+The Markdown export also contains a **Steps** section (the API calls per step) and a **Data flow** section.
+
 ## Privacy and safety
 
 - **Everything stays on your computer.** The extension has no server, sends nothing anywhere and has no analytics.
   The recording lives in `chrome.storage.local` until you press **Clear** or remove the extension.
 - **Request headers are not read**, with one exception: `Content-Type`, to know how to read a body. Cookies,
   authorization headers and tokens never enter the recording.
+- **Values are remembered when example data is on.** The search and the data flow use the values seen in bodies and query
+  strings. Like the example calls, they stay on your computer and are removed with **Clear**. With **Keep example data**
+  off, no values are kept: you still get steps, fields and timing, but not value search or data flow.
 - **Example data is on by default.** The latest three calls per endpoint are stored with their URL (including query
   values) and a shortened body, so you can see what an endpoint returns. That can contain personal data or secrets that
   appear in URLs or bodies. Untick **Keep example data** under Options in the popup to keep only field names and types.
@@ -116,6 +147,7 @@ Response fields
 |---|---|
 | `debugger` | Reads the Network events of the one tab you switch on, the same source as the DevTools Network tab. This is what makes response bodies readable. Chrome shows its "debugging" bar while it is active. |
 | `storage` | Keeps the recording and your settings on your computer. |
+| `unlimitedStorage` | Lifts Chrome's 10 MB limit on that storage, because recordings with example data can grow large. |
 | `activeTab` | Shows which site the current tab is. |
 
 There are no host permissions and no code runs inside the pages you visit.
@@ -135,6 +167,7 @@ the result, `popup.html` controls the recording.
 - Multipart uploads are listed, but their parts are not broken down.
 - Example calls are shortened: the first 3 items of lists, texts cut at 200 characters (4000 for text bodies),
   60 keys per object and 8 levels deep. The field structure looks at the first 20 items of each list.
+- The call log keeps the last 5000 calls, the data flow remembers the last 3000 identifier values.
 - Chrome internal pages (`chrome://`) and the Chrome Web Store cannot be recorded.
 
 ## Development
@@ -150,7 +183,7 @@ npm test
 | `manifest.json` | Extension manifest (Manifest V3) |
 | `background.js` | Service worker: attaches the debugger, stores calls |
 | `capture.mjs` | Network events to finished calls (pure logic) |
-| `recorder.mjs` | Grouping, field inference, examples, Markdown report (pure logic) |
+| `recorder.mjs` | Grouping, field inference, examples, steps, value search, data flow, Markdown report (pure logic) |
 | `popup.html`, `popup.js` | Toolbar popup |
 | `viewer.html`, `viewer.js`, `viewer.css` | Full view page |
 | `styles.css` | Shared design tokens and components |

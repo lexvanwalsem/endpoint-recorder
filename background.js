@@ -1,4 +1,4 @@
-import { addEntry, createStore } from './recorder.mjs';
+import { addEntry, createStore, markStep } from './recorder.mjs';
 import { createCapture } from './capture.mjs';
 
 // The worker can be stopped at any time. The recording lives in chrome.storage.local, the list of tabs being
@@ -89,6 +89,12 @@ async function handle(msg) {
     case 'stop':
       await stop(msg.tabId);
       return { ok: true };
+    case 'mark': {
+      const { store } = await load();
+      const index = markStep(store, msg.label);
+      await chrome.storage.local.set({ store });
+      return { ok: true, index, label: store.steps[index].label };
+    }
     case 'clear':
       await chrome.storage.local.set({ store: createStore() });
       return null;

@@ -108,3 +108,16 @@ header h1, header button { white-space: nowrap; }
 .detail .title button { padding: 5px 12px; font-size: 13.5px; }
 .detail .chips { margin: 0 0 4px; }
 .hint { margin-top: 12px; font-size: 13.5px; }
+
+/* Steps and data flow */
+.modebar { padding: 12px 14px 0; }
+.steps-mode .filters { display: none; }
+.match { font-size: 13px; margin-top: 3px; color: var(--muted); overflow-wrap: anywhere; }
+.match .where { font-weight: 700; margin-right: 8px; color: var(--accent); font-family: system-ui, sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.link { color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.flow { margin: 12px 0 4px; }
+.flow .label { color: var(--muted); font-size: 13.5px; margin-bottom: 4px; }
+.flowrow { padding: 4px 0; overflow-wrap: anywhere; }
+.flow code { background: var(--panel); border-radius: 5px; padding: 1px 6px; }
+.arrow { display: inline-block; min-width: 36px; font-weight: 700; font-size: 12px; color: var(--accent); text-transform: uppercase; }
+label.check { display: inline-flex; gap: 8px; align-items: center; }

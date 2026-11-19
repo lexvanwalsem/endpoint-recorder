@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Endpoint Recorder",
-  "version": "0.8.0",
-  "description": "Records the network calls of one browser tab and shows endpoints, fields, content types, sizes and real example responses. Switch it on per tab from the toolbar icon.",
+  "version": "0.9.0",
+  "description": "Records the network calls of one browser tab and shows endpoints, fields, steps, data flow and real example responses. Switch it on per tab from the toolbar icon.",
   "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
   "action": {
     "default_title": "Endpoint Recorder",
@@ -10,5 +10,5 @@
     "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
   },
   "background": { "service_worker": "background.js", "type": "module" },
-  "permissions": ["debugger", "storage", "activeTab"]
+  "permissions": ["debugger", "storage", "unlimitedStorage", "activeTab"]
 }

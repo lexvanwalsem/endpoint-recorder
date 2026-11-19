@@ -1,11 +1,11 @@
 // Full page view of the recording: search, filter, sort, per-endpoint detail and export.
-import { createStore, flatten, formatBytes, toMarkdown } from './recorder.mjs';
+import { createStore, endpointLabel, flatten, formatBytes, groupSteps, isApiCall, toMarkdown } from './recorder.mjs';
 
 const $ = (id) => document.getElementById(id);
 const MAX_ROWS = 1000;
 
 let store = createStore();
-const state = { q: '', method: '', host: '', type: '', sort: 'count', errorsOnly: false, withBody: false, selected: null, side: 'sample', sample: 0, fieldQ: '' };
+const state = { q: '', method: '', host: '', type: '', sort: 'count', errorsOnly: false, withBody: false, selected: null, side: 'sample', sample: 0, fieldQ: '', mode: 'endpoints', step: undefined, apiOnly: true };
 
 function h(tag, props = {}, ...kids) {
   const el = document.createElement(tag);
@@ -37,7 +37,8 @@ function searchText(ep) {
   if (hit && hit.count === ep.count) return hit.text;
   const rows = [...(ep.req ? flatten(ep.req) : []), ...(ep.res ? flatten(ep.res) : [])];
   const samples = (ep.samples ?? []).map((s) => `${s.url} ${JSON.stringify(s.req ?? '')} ${JSON.stringify(s.res ?? '')}`);
-  const text = [ep.key, ...Object.keys(ep.query), ...rows.map((r) => `${r.path} ${r.examples.join(' ')}`), ...samples].join('\n').toLowerCase();
+  const found = (ep.found ?? []).map((f) => `${f[1]} ${f[2]}`);
+  const text = [ep.key, ...Object.keys(ep.query), ...rows.map((r) => `${r.path} ${r.examples.join(' ')}`), ...samples, ...found].join('\n').toLowerCase();
   indexCache.set(ep.key, { count: ep.count, text });
   return text;
 }
@@ -82,7 +83,7 @@ function renderList(eps) {
   }
   list.replaceChildren(...eps.map((ep) => h('div', {
     class: `item${ep.key === state.selected ? ' selected' : ''}`,
-    onclick: () => { state.selected = ep.key; state.fieldQ = ''; state.sample = 0; render(); },
+    onclick: () => pick(ep.key, matchLines(ep)[0]),
   },
   h('div', { class: 'top' },
     h('span', { class: `mpill ${ep.method}` }, ep.method),
@@ -90,8 +91,96 @@ function renderList(eps) {
   h('div', { class: 'meta' },
     `${ep.host} · ${plural(ep.count, 'call')} · ${Math.round(avg(ep))} ms`,
     ep.type && !['XHR', 'Fetch'].includes(ep.type) ? h('span', { class: 'pill' }, ep.type) : null,
-    hasError(ep) ? h('span', { class: 'pill err' }, plural(errorCount(ep), 'error')) : null))));
+    hasError(ep) ? h('span', { class: 'pill err' }, plural(errorCount(ep), 'error')) : null),
+  ...matchLines(ep).map(matchRow))));
 }
+
+/** Values of this endpoint that contain the search text: [side, path, value]. */
+function matchLines(ep) {
+  const q = state.q.trim().toLowerCase();
+  if (!q) return [];
+  return (ep.found ?? []).filter((f) => f[2].toLowerCase().includes(q)).slice(0, 2);
+}
+
+const WHERE = { res: 'received', req: 'sent', url: 'query' };
+const matchRow = ([side, path, value]) => h('div', { class: 'match mono' }, h('span', { class: 'where' }, WHERE[side]), `${path} = `, highlight(value, state.q.trim()));
+
+/** Select an endpoint; with a search hit, open the matching field. */
+function pick(key, hit) {
+  setMode('endpoints');
+  state.selected = key;
+  state.sample = 0;
+  state.fieldQ = hit ? hit[1] : '';
+  if (hit && hit[0] !== 'url') state.side = hit[0];
+  render();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  for (const b of document.querySelectorAll('#mode button')) b.classList.toggle('active', b.dataset.mode === mode);
+}
+
+function jumpTo(key) {
+  pick(key, null);
+}
+
+/** Where the values of this endpoint come from and where they are used again. */
+function flowBlock(ep) {
+  const chains = Object.values(store.chains ?? {});
+  const inputs = chains.filter((c) => c.to.key === ep.key && store.endpoints[c.from.key]);
+  const outputs = chains.filter((c) => c.from.key === ep.key && store.endpoints[c.to.key]);
+  if (!inputs.length && !outputs.length) return null;
+  const link = (key) => h('span', { class: 'link', onclick: () => jumpTo(key) }, endpointLabel(store.endpoints[key]));
+  const code = (t) => h('code', { class: 'mono' }, t);
+  const note = (c) => h('span', { class: 'muted' }, ` e.g. ${c.example}, ${c.count}x`);
+  return h('div', { class: 'flow' },
+    h('div', { class: 'label' }, 'Data flow'),
+    inputs.map((c) => h('div', { class: 'flowrow' }, h('span', { class: 'arrow' }, 'in'), code(c.to.where), ' comes from ', link(c.from.key), ' ', code(c.from.path), note(c))),
+    outputs.map((c) => h('div', { class: 'flowrow' }, h('span', { class: 'arrow' }, 'out'), code(c.from.path), ' is used in ', link(c.to.key), ' ', code(c.to.where), note(c))));
+}
+
+function renderStepList() {
+  const groups = groupSteps(store);
+  const list = $('list');
+  if (!groups.length) {
+    list.replaceChildren(h('div', { class: 'empty' },
+      h('div', { class: 'big' }, 'No steps yet'),
+      'While recording, type what you are about to do in the extension popup and press "Mark step". Calls are then grouped per step.'));
+    return;
+  }
+  if (!groups.some((g) => g.index === state.step)) state.step = groups[groups.length - 1].index; // newest step
+  list.replaceChildren(...groups.map((g) => h('div', {
+    class: `item${g.index === state.step ? ' selected' : ''}`,
+    onclick: () => { state.step = g.index; render(); },
+  },
+  h('div', { class: 'top' }, h('span', { class: 'path' }, g.index === null ? g.label : `${g.index + 1}. ${g.label}`)),
+  h('div', { class: 'meta' }, `${plural(g.calls.filter(isApiCall).length, 'API call')}${g.at ? ` · ${new Date(g.at).toLocaleTimeString()}` : ''}`))));
+}
+
+function renderStepDetail() {
+  const right = $('right');
+  const g = groupSteps(store).find((x) => x.index === state.step);
+  if (!g) { right.replaceChildren(h('div', { class: 'empty' })); return; }
+  const calls = g.calls.filter((c) => (!state.apiOnly || isApiCall(c)) && store.endpoints[c.key]);
+  const t0 = g.at ? Date.parse(g.at) : (g.calls[0]?.at ?? 0);
+  right.replaceChildren(h('div', { class: 'detail' },
+    h('div', { class: 'title' }, h('h2', {}, g.index === null ? g.label : `Step ${g.index + 1}: ${g.label}`)),
+    h('div', { class: 'sub muted' }, `${g.at ? `${time(g.at)} · ` : ''}${plural(calls.length, 'call')} shown`),
+    h('div', { class: 'tools' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.apiOnly, onchange: (e) => { state.apiOnly = e.target.checked; render(); } }), ' API calls only (XHR and fetch)')),
+    h('div', { class: 'panel' }, h('div', { class: 'tablewrap' }, h('table', {},
+      h('thead', {}, h('tr', {}, ['Time', 'Call', 'Status', 'Duration', 'Size', 'Type'].map((t) => h('th', {}, t)))),
+      h('tbody', {}, calls.map((c) => {
+        const ep = store.endpoints[c.key];
+        return h('tr', {},
+          h('td', { class: 'mono' }, `+${Math.max(0, (c.at - t0) / 1000).toFixed(1)} s`),
+          h('td', {}, h('span', { class: `mpill ${ep.method}` }, ep.method), ' ', h('span', { class: 'link mono', onclick: () => jumpTo(c.key) }, ep.path + (ep.rpc ? ` ${ep.rpc}` : '')), h('div', { class: 'muted' }, ep.host)),
+          h('td', {}, h('span', { class: `pill ${c.status >= 400 ? 'err' : 'ok'}` }, String(c.status))),
+          h('td', {}, `${c.timeMs} ms`),
+          h('td', {}, c.size ? formatBytes(c.size) : '-'),
+          h('td', {}, c.type || '-'));
+      })))))));
+}
+
 
 function fieldTable(node, term) {
   const t = term.trim().toLowerCase();
@@ -227,6 +316,7 @@ function renderDetail(eps) {
       Object.entries(ep.statuses).map(([s, n]) => h('span', { class: `pill ${Number(s) >= 400 ? 'err' : 'ok'}` }, `${s} x${n}`)),
       Object.entries(ep.resTypes ?? {}).map(([k, n]) => h('span', { class: 'pill mono', title: 'Response content type' }, `${k} x${n}`)),
       Object.keys(ep.query).map((k) => h('span', { class: 'pill mono', title: 'Query parameter' }, `?${k}`))),
+    flowBlock(ep),
     ep.samples?.length ? null : h('div', { class: 'hint muted' }, 'No example calls stored. Turn on "Keep example data" in the extension popup and record again.'),
     side ? h('div', { class: 'panel' },
       h('div', { class: 'panel-head' },
@@ -260,9 +350,12 @@ function render() {
     h('span', { class: 'stat' }, h('b', {}, all.length), ' endpoints'),
     h('span', { class: 'stat' }, h('b', {}, calls), ' calls'),
     errors > 0 ? h('span', { class: 'stat pill err' }, h('b', {}, errors), errors === 1 ? ' error' : ' errors') : null,
+    store.steps?.length ? h('span', { class: 'stat' }, h('b', {}, store.steps.length), store.steps.length === 1 ? ' step' : ' steps') : null,
     store.started ? h('span', { class: 'stat muted' }, `since ${time(store.started)}`) : null,
   ].filter(Boolean));
   $('count').textContent = `${eps.length} of ${all.length}`;
+  $('left').classList.toggle('steps-mode', state.mode === 'steps');
+  if (state.mode === 'steps') { renderStepList(); renderStepDetail(); return; }
   renderList(eps);
   const right = $('right');
   const typingInDetail = right.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
@@ -279,6 +372,7 @@ const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
 $('q').oninput = (e) => { state.q = e.target.value; render(); };
 $('method').onchange = (e) => { state.method = e.target.value; render(); };
 $('host').onchange = (e) => { state.host = e.target.value; render(); };
+for (const b of document.querySelectorAll('#mode button')) b.onclick = () => { setMode(b.dataset.mode); render(); };
 $('type').onchange = (e) => { state.type = e.target.value; render(); };
 $('sort').onchange = (e) => { state.sort = e.target.value; render(); };
 $('errorsOnly').onchange = (e) => { state.errorsOnly = e.target.checked; render(); };

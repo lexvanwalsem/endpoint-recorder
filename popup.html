@@ -6,15 +6,18 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="stylesheet" href="styles.css">
 <style>
-  body { width: 340px; padding: 16px; font-size: 15px; }
+  body { width: 370px; padding: 16px; font-size: 15px; }
   .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
   .brand { display: flex; align-items: center; gap: 10px; }
   .brand img { display: block; }
-  h1 { font-size: 17px; margin: 0; }
-  .site { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  h1 { font-size: 17px; margin: 0; white-space: nowrap; }
+  .site { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
   #toggle { width: 100%; padding: 11px; font-size: 16px; }
   .status { margin: 12px 0; display: flex; align-items: center; min-height: 24px; }
   .status.on { color: var(--danger); font-weight: 600; }
+  .stepbox { margin: 0 0 12px; }
+  .steprow { display: flex; gap: 8px; }
+  .steprow input { flex: 1; min-width: 0; }
   .actions { display: flex; gap: 8px; }
   .actions button { flex: 1; }
   details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -33,6 +36,13 @@
 <button id="toggle" class="primary"></button>
 <div id="error" class="err"></div>
 <div id="state" class="status"></div>
+<div id="stepBox" class="stepbox" hidden>
+  <div class="steprow">
+    <input id="stepLabel" type="text" placeholder="What are you about to do?" maxlength="100">
+    <button id="mark">Mark step</button>
+  </div>
+  <div id="stepNow" class="muted note"></div>
+</div>
 <div class="actions">
   <button id="open">Open full view</button>
   <button id="reload" title="Reload this tab so the calls made while the page loads are caught too">Reload tab</button>

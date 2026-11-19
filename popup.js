@@ -21,6 +21,11 @@ async function render() {
   line.append(`${recording ? 'Recording' : 'Not recording'}: ${eps.length} endpoints, ${calls} calls`);
   $('state').className = `status${recording ? ' on' : ''}`;
   $('state').replaceChildren(line);
+
+  // marking steps only makes sense while recording
+  $('stepBox').hidden = !recording;
+  const steps = store.steps ?? [];
+  $('stepNow').textContent = steps.length ? `Current step ${steps.length}: ${steps.at(-1).label}` : 'Calls are grouped under the step you mark. Mark one before you click.';
   return recording;
 }
 
@@ -30,6 +35,15 @@ $('toggle').onclick = async () => {
   $('error').textContent = result?.ok === false ? `Could not start: ${result.error}` : '';
   await render();
 };
+
+async function markCurrentStep() {
+  const label = $('stepLabel').value;
+  await send({ type: 'mark', label });
+  $('stepLabel').value = '';
+  await render();
+}
+$('mark').onclick = markCurrentStep;
+$('stepLabel').onkeydown = (e) => { if (e.key === 'Enter') markCurrentStep(); };
 
 $('reload').onclick = () => chrome.tabs.reload(tab.id);
 $('examples').onchange = () => send({ type: 'setSettings', keepExamples: $('examples').checked });

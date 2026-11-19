@@ -10,6 +10,11 @@ const SAMPLE_ARRAY_ITEMS = 3;
 const SAMPLE_KEYS = 60;
 const SAMPLE_STRING = 200;
 const SAMPLE_TEXT = 4000;
+const MAX_CALLS = 5000; // calls kept for the steps view
+const MAX_INDEX = 3000; // id-like values remembered for the data flow
+const MAX_FOUND = 200; // searchable values per endpoint
+const MAX_LEAVES = 300; // values taken from one body
+const FOUND_VALUE = 120;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -75,7 +80,16 @@ export function flatten(node, path = '$', parentN = node.n) {
 }
 
 export function createStore() {
-  return { endpoints: {}, started: new Date().toISOString() };
+  // steps: what the user marked while recording; calls: one compact record per call (no bodies);
+  // valueIndex: id-like values seen in responses; chains: where such a value was used again in a later request
+  return { endpoints: {}, started: new Date().toISOString(), steps: [], calls: [], callSeq: 0, valueIndex: {}, chains: {} };
+}
+
+/** Mark a step ("opened a ticket"). Calls recorded from now on belong to it. Returns the step index. */
+export function markStep(store, label) {
+  const steps = (store.steps ??= []);
+  steps.push({ label: String(label ?? '').trim().slice(0, 100) || `Step ${steps.length + 1}`, at: new Date().toISOString() });
+  return steps.length - 1;
 }
 
 /** 'application/json; charset=utf-8' -> 'application/json'. Missing -> '(none)'. */
@@ -145,6 +159,13 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
   if (reqValue !== undefined) mergeSchema((ep.req ??= newNode()), reqValue, { keepExamples });
   if (resValue !== undefined) mergeSchema((ep.res ??= newNode()), resValue, { keepExamples });
 
+  // Compact record of every call, for the steps view. Holds no bodies and no values.
+  (store.calls ??= []).push({
+    n: (store.callSeq = (store.callSeq ?? 0) + 1), at: Date.now(), step: store.steps?.length ? store.steps.length - 1 : null,
+    key, status: entry.status, timeMs: Math.round(entry.timeMs ?? 0), size: entry.size, type: entry.type,
+  });
+  if (store.calls.length > MAX_CALLS) store.calls.splice(0, store.calls.length - MAX_CALLS);
+
   if (keepExamples) {
     // A real example call: the full URL (with query values) and what came back, shortened to stay readable.
     const ctx = { cut: false };
@@ -157,8 +178,93 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
     sample.cut = ctx.cut;
     (ep.samples ??= []).push(sample);
     if (ep.samples.length > MAX_SAMPLES) ep.samples.shift();
+
+    // Values for "search by what you see" and for the data flow between calls.
+    const resLeaves = [];
+    const reqLeaves = [];
+    if (resValue !== undefined) collectLeaves(resValue, '$', resLeaves);
+    if (reqValue !== undefined) collectLeaves(reqValue, '$', reqLeaves);
+    addFound(ep, 'res', resLeaves);
+    addFound(ep, 'req', reqLeaves);
+    const queryLeaves = [...url.searchParams].map(([k, v]) => [`?${k}`, v]);
+    addFound(ep, 'url', queryLeaves);
+    linkChains(store, key, url, queryLeaves, reqLeaves); // before indexing this response, so a call never links to itself
+    indexValues(store, key, resLeaves);
   }
   return ep;
+}
+
+/** Leaf values (strings and numbers) of a JSON value with their path, in the same notation as the field tables. */
+function collectLeaves(value, path, out, depth = 0) {
+  if (out.length >= MAX_LEAVES) return;
+  if (Array.isArray(value)) {
+    if (depth < MAX_DEPTH) for (const v of value.slice(0, MAX_ARRAY_ITEMS)) collectLeaves(v, `${path}[]`, out, depth + 1);
+  } else if (value && typeof value === 'object') {
+    if (depth < MAX_DEPTH) for (const [k, v] of Object.entries(value)) collectLeaves(v, `${path}.${k}`, out, depth + 1);
+  } else if (typeof value === 'string' || typeof value === 'number') {
+    out.push([path, value]);
+  }
+}
+
+/** Remember which values were seen in an endpoint, so they can be found again by typing them. [side, path, value] */
+function addFound(ep, side, leaves) {
+  const found = (ep.found ??= []);
+  const seen = new Set(found.map((f) => `${f[0]}|${f[1]}|${f[2]}`));
+  for (const [path, value] of leaves) {
+    if (found.length >= MAX_FOUND) return;
+    const text = String(value).slice(0, FOUND_VALUE);
+    const id = `${side}|${path}|${text}`;
+    if (!text || seen.has(id)) continue;
+    seen.add(id);
+    found.push([side, path, text]);
+  }
+}
+
+// A value is worth following when it looks like an identifier: a long token or code, or a number in a field called id/token/key/...
+const ID_FIELD = /(^|[._\]])([a-z0-9]*_?ids?|uuid|token|key|code|ref|reference|number|nr|hash|session|slug)$/i;
+const looksLikeToken = (s) => s.length >= 6 && s.length <= 100 && !/\s/.test(s) && (/\d/.test(s) || s.length >= 16);
+
+function producedValue(path, value) {
+  if (typeof value === 'string') return looksLikeToken(value) ? value : null;
+  return Number.isInteger(value) && value >= 10 && ID_FIELD.test(path) ? String(value) : null;
+}
+
+function consumedValue(value) {
+  const s = String(value);
+  return /^\d{2,15}$/.test(s) || looksLikeToken(s) ? s : null;
+}
+
+function indexValues(store, key, leaves) {
+  const index = (store.valueIndex ??= {});
+  for (const [path, value] of leaves) {
+    const v = producedValue(path, value);
+    if (v === null) continue;
+    delete index[`v:${v}`]; // re-insert so the newest producer is last
+    index[`v:${v}`] = { key, path };
+  }
+  const keys = Object.keys(index);
+  if (keys.length > MAX_INDEX) for (const k of keys.slice(0, keys.length - MAX_INDEX)) delete index[k];
+}
+
+/** If this request carries a value an earlier response produced, record that link (producer field -> where it is used here). */
+function linkChains(store, key, url, queryLeaves, bodyLeaves) {
+  const index = store.valueIndex ?? {};
+  const used = [];
+  for (const seg of url.pathname.split('/')) {
+    let decoded = seg;
+    try { decoded = decodeURIComponent(seg); } catch { /* keep raw */ }
+    used.push(['path', decoded]);
+  }
+  for (const [name, value] of queryLeaves) used.push([`query ${name.replace(/^\?/, '')}`, value]);
+  for (const [path, value] of bodyLeaves) used.push([`body ${path}`, value]);
+  for (const [where, value] of used) {
+    const v = consumedValue(value);
+    const from = v === null ? undefined : index[`v:${v}`];
+    if (!from || from.key === key) continue;
+    const id = `${from.key} ${from.path} -> ${key} ${where}`;
+    const chain = ((store.chains ??= {})[id] ??= { from, to: { key, where }, count: 0, example: v.slice(0, 40) });
+    chain.count++;
+  }
 }
 
 function clip(text, ctx) {
@@ -205,12 +311,53 @@ function table(node) {
   return out;
 }
 
+export const endpointLabel = (ep) => `${ep.method} ${ep.host}${ep.path}${ep.rpc ? ` [${ep.rpc}]` : ''}`;
+export const isApiCall = (c) => !c.type || c.type === 'XHR' || c.type === 'Fetch';
+
+/** The recorded calls grouped by the steps the user marked. [] when no step was marked. */
+export function groupSteps(store) {
+  const steps = store.steps ?? [];
+  if (!steps.length) return [];
+  const calls = store.calls ?? [];
+  const groups = steps.map((s, i) => ({ index: i, label: s.label, at: s.at, calls: calls.filter((c) => c.step === i) }));
+  const before = calls.filter((c) => c.step === null || c.step === undefined);
+  if (before.length) groups.unshift({ index: null, label: 'Before the first step', at: null, calls: before });
+  return groups;
+}
+
+function stepsMarkdown(store, only) {
+  const groups = groupSteps(store);
+  if (!groups.length) return [];
+  const lines = ['# Steps', '', 'The API calls made after each step you marked.', ''];
+  for (const g of groups) {
+    lines.push(`## ${g.index === null ? g.label : `Step ${g.index + 1}: ${g.label}`}`, '');
+    const perKey = new Map();
+    for (const c of g.calls.filter(isApiCall)) if (store.endpoints[c.key] && (!only || only.includes(c.key))) perKey.set(c.key, (perKey.get(c.key) ?? 0) + 1);
+    if (!perKey.size) lines.push('- (no API calls)');
+    for (const [key, n] of perKey) lines.push(`- ${endpointLabel(store.endpoints[key])}${n > 1 ? ` x${n}` : ''}`);
+    lines.push('');
+  }
+  return lines;
+}
+
+function flowMarkdown(store, only) {
+  const ok = (key) => store.endpoints[key] && (!only || only.includes(key));
+  const chains = Object.values(store.chains ?? {}).filter((c) => ok(c.from.key) && ok(c.to.key)).sort((a, b) => b.count - a.count);
+  if (!chains.length) return [];
+  const lines = ['# Data flow', '', 'A value returned by one call and used again in a later call.', ''];
+  for (const c of chains) {
+    lines.push(`- ${endpointLabel(store.endpoints[c.from.key])} returns \`${c.from.path}\`, used in ${endpointLabel(store.endpoints[c.to.key])} (${c.to.where}), ${c.count}x, for example \`${c.example}\``);
+  }
+  lines.push('');
+  return lines;
+}
+
 const counts = (obj) => Object.entries(obj ?? {}).map(([k, n]) => `${k} x${n}`).join(', ');
 
 /** Markdown report. `only` (optional): array of endpoint keys to include. */
 export function toMarkdown(store, only) {
   const eps = Object.values(store.endpoints).filter((ep) => !only || only.includes(ep.key)).sort((a, b) => b.count - a.count);
-  const lines = [`# Recorded endpoints (${eps.length})`, '', `Recording started ${store.started}.`, ''];
+  const lines = [`# Recorded endpoints (${eps.length})`, '', `Recording started ${store.started}.`, '', ...stepsMarkdown(store, only), ...flowMarkdown(store, only)];
   for (const ep of eps) {
     lines.push(`## ${ep.method} ${ep.host}${ep.path}${ep.rpc ? ` [${ep.rpc}]` : ''}`, '');
     lines.push(`- Calls: ${ep.count}, average ${Math.round(ep.timeSum / ep.count)} ms, max ${Math.round(ep.timeMax)} ms`);
