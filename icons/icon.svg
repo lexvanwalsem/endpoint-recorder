@@ -9,6 +9,10 @@
     <path d="M44 20 C31 20 29 28 29 40 L29 53 C29 60 25 64 14 64 C25 64 29 68 29 75 L29 88 C29 100 31 108 44 108"/>
     <path d="M84 20 C97 20 99 28 99 40 L99 53 C99 60 103 64 114 64 C103 64 99 68 99 75 L99 88 C99 100 97 108 84 108"/>
   </g>
-  <circle cx="64" cy="64" r="19" fill="none" stroke="#ff6a4d" stroke-width="4.5" opacity=".45"/>
-  <circle cx="64" cy="64" r="9.5" fill="#ff6a4d"/>
+  <!-- survey marker: ring with crosshair ticks and a centre point -->
+  <g fill="none" stroke="#ff6a4d" stroke-width="4.5" stroke-linecap="round">
+    <circle cx="64" cy="64" r="14"/>
+    <path d="M64 36 V50 M64 78 V92 M36 64 H50 M78 64 H92"/>
+  </g>
+  <circle cx="64" cy="64" r="4.8" fill="#ff6a4d"/>
 </svg>

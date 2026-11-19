@@ -1,4 +1,4 @@
-// Pure logic of the Endpoint Recorder: group requests per endpoint, infer field structure, keep example calls, render a report.
+// Pure logic of Surveyor: group requests per endpoint, infer field structure, keep example calls, render a report.
 // No browser APIs here so it can be unit tested with node:test.
 
 const MAX_DEPTH = 8;

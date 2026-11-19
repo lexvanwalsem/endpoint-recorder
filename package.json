@@ -1,11 +1,11 @@
 {
-  "name": "endpoint-recorder",
-  "version": "0.9.0",
+  "name": "surveyor",
+  "version": "0.10.0",
   "private": true,
   "license": "MIT",
-  "description": "Chrome extension that records the network calls of one tab and builds a map of endpoints, fields and real example responses.",
+  "description": "The missing manual for undocumented APIs: a Chrome extension that records the network calls of one tab and documents endpoints, fields, steps and data flow.",
   "type": "module",
-  "repository": { "type": "git", "url": "git+https://github.com/lexvanwalsem/endpoint-recorder.git" },
+  "repository": { "type": "git", "url": "git+https://github.com/lexvanwalsem/surveyor.git" },
   "engines": { "node": ">=20" },
   "scripts": { "test": "node --test" }
 }

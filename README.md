@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="icons/icon-128.png" alt="Endpoint Recorder logo" width="96" height="96">
+  <img src="icons/icon-128.png" alt="Surveyor logo" width="96" height="96">
 </p>
 
-<h1 align="center">Endpoint Recorder</h1>
+<h1 align="center">Surveyor</h1>
 
 <p align="center">
-  <b>Understand how any web app really works, in one click-through.</b><br>
-  Record the network calls of a browser tab and get a searchable map of every endpoint, field, example response,
-  step and data dependency. No documentation needed.
+  <b>The missing manual for undocumented APIs.</b><br>
+  Click through any web system. Surveyor records the calls behind it and writes down how it works: endpoints, fields,
+  real example responses, the steps of each task and the data passed between calls.
 </p>
 
 <p align="center">
-  <a href="https://github.com/lexvanwalsem/endpoint-recorder/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/lexvanwalsem/endpoint-recorder/actions/workflows/test.yml/badge.svg"></a>
+  <a href="https://github.com/lexvanwalsem/surveyor/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/lexvanwalsem/surveyor/actions/workflows/test.yml/badge.svg"></a>
   <img alt="Chrome extension, Manifest V3" src="https://img.shields.io/badge/Chrome-Manifest%20V3-0d7c75">
   <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-0d7c75">
   <img alt="Local only" src="https://img.shields.io/badge/data-stays%20on%20your%20computer-0d7c75">
@@ -22,10 +22,18 @@
   <img src="docs/full-view.png" alt="Search for a value and see which endpoint and field returned it, plus where the data flows" width="900">
 </p>
 
-## What it does
+## The problem
 
-You use the web app as you normally would. Endpoint Recorder watches the calls the page makes to its backend and turns
-them into something you can read, search and share:
+Plenty of systems have a web interface that works and API documentation that does not exist, is out of date or leaves
+out half of what you need. The interface already calls the backend for everything it shows. That knowledge is just buried
+in a long list of requests.
+
+Surveyor digs it out while you use the system, and leaves you with the documentation nobody wrote.
+
+## What Surveyor does
+
+You use the web app as you normally would. Surveyor watches the calls the page makes to its backend and turns them into
+something you can read, search and share:
 
 - **Every endpoint on one screen**, grouped and named, with timing, size and status.
 - **Every field** of every request and response, with its type and how often it appears.
@@ -35,14 +43,33 @@ them into something you can read, search and share:
 
 It works on any site, on a tab that is already open, without a proxy, certificates, command line or account.
 
+## How it is different
+
+Good tools already exist that turn browser traffic into an OpenAPI specification, for example
+[OpenAPI DevTools](https://chromewebstore.google.com/detail/jelghndoknklgabjgaeppjhommkkmdii),
+[demystify](https://github.com/tfmorris/demystify) and
+[API Network Recorder](https://chromewebstore.google.com/detail/jbanbhbcmngjfdchpiimomffibimbckl). A specification
+tells you which endpoints exist and what their schemas look like. When you have to integrate with a system, that is half
+the answer. The other half is how it **behaves**: which calls make up one task, in what order, and which values travel
+from one call to the next.
+
+Surveyor is built around that second half:
+
+- **Steps** show which endpoints one action in the interface triggers.
+- **Data flow** shows where a value comes from and where it is used again.
+- **Search by value** finds the endpoint and field behind anything you can see on screen.
+- **Real examples of every kind of body**, not only JSON: HTML, XML, form data and plain text too.
+- **Privacy by design**: request headers are never stored and everything stays on your computer.
+
+Use it next to a spec generator or instead of one. An OpenAPI export is on the list below.
+
 ## Why use it
 
-Most systems have an interface that works and documentation that does not. The interface already calls the API for
-everything it shows, but that knowledge is hidden in a long list of requests. This is what changes:
+This is what changes compared with working in the Chrome DevTools Network tab alone:
 
-| You want to know | Without | With Endpoint Recorder |
+| You want to know | Without Surveyor | With Surveyor |
 |---|---|---|
-| Where does this number on screen come from? | Open request after request in the Network tab until you spot it | Type the number. The endpoints that returned it are listed with the exact field, and the field opens |
+| Where does this number on screen come from? | Open request after request until you spot it | Type the number. The endpoints that returned it are listed with the exact field, and the field opens |
 | What does clicking "Close ticket" trigger? | Clear the log, click, read the new rows, remember them | Mark a step, click. The step lists exactly its calls, in order |
 | Which endpoints exist? | A list where `/orders/1001` and `/orders/1002` are separate rows | One row per endpoint, ids become `{id}`, JSON-RPC and GraphQL are split by what they call |
 | Which fields can be missing? | Compare several responses by hand | Every field shows its type and how often it is present |
@@ -52,12 +79,12 @@ everything it shows, but that knowledge is hidden in a long list of requests. Th
 | Share it with a colleague | Send a HAR file: a raw dump with every request | A readable report per endpoint, filtered to what matters |
 | Know what a page sends to third parties | Scroll for other hostnames | Every host is recorded and can be filtered |
 
-It is not a replacement for Chrome DevTools. It is what you reach for when the question is "how does this system work",
-instead of "why did this one request fail".
+It does not replace DevTools. It is what you reach for when the question is "how does this system work", instead of
+"why did this one request fail".
 
 ### Good for
 
-- **Planning an integration** with a system that has poor or no API documentation.
+- **Integrating with a system** that has poor or no API documentation.
 - **Documenting a legacy system** while you click through it.
 - **Bug reports and QA**: attach the exact steps and calls instead of a screenshot.
 - **Analysts and support**: find out which service a figure on a dashboard really comes from.
@@ -114,7 +141,7 @@ errors, method, host and request type, and sort on calls, speed or recency.
 
 ## Install
 
-The extension is not in the Chrome Web Store. Load it as an unpacked extension (takes a minute):
+Surveyor is not in the Chrome Web Store. Load it as an unpacked extension (takes a minute):
 
 1. Download or clone this repository.
 2. Open `chrome://extensions` and switch on **Developer mode**.
@@ -125,8 +152,8 @@ After changing the code, press the refresh icon on the extension card.
 
 ## Use
 
-1. Open the web app in a tab and click the extension icon.
-2. Press **Record this tab**. Chrome shows a bar saying "Endpoint Recorder started debugging this browser".
+1. Open the web app in a tab and click the Surveyor icon.
+2. Press **Record this tab**. Chrome shows a bar saying "Surveyor started debugging this browser".
    Leave it open: closing it stops the recording.
 3. Before each thing you do, type a short description in the step field and press **Mark step**
    ("open the ticket", "reply", "close"). This is optional, but it makes the result much easier to read.
@@ -171,7 +198,7 @@ The export starts with a **Steps** section and a **Data flow** section when you 
 - **You decide what is kept.** With **Keep example data** off, only field names and types are kept.
 - **No dependencies and small enough to read.** About a thousand lines of plain JavaScript, no build step, no packages
   to trust. You can review all of it in an afternoon.
-- **Tested.** 30 automated tests run on every change.
+- **Tested.** Automated tests run on every change.
 - **Open source** under the MIT license.
 
 ### Privacy details
@@ -195,10 +222,10 @@ There are no host permissions and no code runs inside the pages you visit.
 
 ## How it works
 
-The extension attaches the Chrome debugger to the tab and listens to its Network events. For each finished call it
-collects method, URL, status, timing and size, and asks for the response body. `capture.mjs` turns the events into
-calls, `recorder.mjs` groups them per endpoint, infers the field structure, keeps the examples and finds the links
-between calls. `viewer.html` shows the result, `popup.html` controls the recording.
+Surveyor attaches the Chrome debugger to the tab and listens to its Network events. For each finished call it collects
+method, URL, status, timing and size, and asks for the response body. `capture.mjs` turns the events into calls,
+`recorder.mjs` groups them per endpoint, infers the field structure, keeps the examples and finds the links between
+calls. `viewer.html` shows the result, `popup.html` controls the recording.
 
 How an identifier is recognised for the data flow: a token or code (6 to 100 characters without spaces, with a digit or at
 least 16 characters), or a number of 10 or more in a field named like `id`, `token`, `key` or `code`. Links are a strong
@@ -215,13 +242,14 @@ hint, not proof: check them. The newest call that returned a value is taken as i
   60 keys per object and 8 levels deep. The field structure and the value search look at the first 20 items of each list,
   and remember up to 200 distinct values per endpoint.
 - The call log keeps the last 5000 calls and the data flow the last 3000 identifier values.
+- You only learn about what you click: calls you never trigger are not documented.
 - Chrome internal pages (`chrome://`) and the Chrome Web Store cannot be recorded.
 
-## Ideas
+## What is next
 
-Not promises, but where it could go next: export as an OpenAPI specification and TypeScript types, copy a call as cURL
-or fetch, compare two recordings, detect pagination and authentication, flag personal data in responses, record
-WebSockets, and open an export in the viewer without the extension. Issues and pull requests are welcome.
+Not promises, but where it is going: export as an OpenAPI specification and TypeScript types, your own descriptions per
+endpoint and field that end up in the export, a complete manual as one document, copy a call as cURL or fetch, compare two
+recordings, detect pagination and authentication, and record WebSockets. Issues and pull requests are welcome.
 
 ## Development
 
