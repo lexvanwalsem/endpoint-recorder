@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Endpoint Recorder",
+  "version": "0.4.0",
+  "description": "Records the XHR/fetch endpoints of one browser tab, with request and response field structure. Switch it on per tab from the toolbar icon.",
+  "action": { "default_title": "Endpoint Recorder", "default_popup": "popup.html" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["debugger", "storage", "activeTab"]
+}

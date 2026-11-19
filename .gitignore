@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.DS_Store
+# Exports of recordings can contain customer data
+endpoints-*.json
+endpoints-*.md

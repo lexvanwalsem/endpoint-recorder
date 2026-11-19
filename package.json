@@ -1,0 +1,8 @@
+{
+  "name": "endpoint-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome DevTools panel that records the endpoints a web app calls and their field structure.",
+  "type": "module",
+  "scripts": { "test": "node --test test/" }
+}
