@@ -121,3 +121,18 @@ header h1, header button { white-space: nowrap; }
 .flow code { background: var(--panel); border-radius: 5px; padding: 1px 6px; }
 .arrow { display: inline-block; min-width: 36px; font-weight: 700; font-size: 12px; color: var(--accent); text-transform: uppercase; }
 label.check { display: inline-flex; gap: 8px; align-items: center; }
+
+/* Contour style: map texture in the header, an amber marker on the selected item */
+header { background: var(--surface) var(--topo) right center / auto 140% no-repeat; }
+.item { border-radius: var(--radius); }
+.item.selected { box-shadow: inset 4px 0 0 var(--amber); }
+.card { border-radius: var(--radius); }
+.empty { background: var(--topo) center bottom / 100% auto no-repeat; padding-bottom: 90px; }
+.hint { padding: 8px 12px; border-radius: 10px; background: var(--amber-weak); }
+
+/* Steps are waypoints on a route */
+.wp { display: inline-grid; place-items: center; min-width: 26px; height: 26px; border-radius: 50%; background: var(--amber); color: #2b1d00; font-weight: 800; font-size: 13px; flex: none; }
+.wp-start { background: transparent; border: 2px dashed var(--amber); min-width: 22px; height: 22px; }
+.item .top .wp { align-self: center; }
+#right { background: var(--bg) var(--topo-soft) right top / 1100px auto no-repeat; }
+header { background-size: auto 220%; }

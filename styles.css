@@ -1,59 +1,68 @@
 /* Shared by popup.html and viewer.html. Colours are tokens; dark mode follows the browser.
-   Palette: deep teal as the accent on a cool neutral base, a warm coral for "recording" and errors. */
+   Palette "contour": forest green on a soft sage base, amber for the map pin, red only for recording and errors. */
 :root {
   color-scheme: light dark;
-  --bg: #f3f6f6;
+  --bg: #f3f7f1;
   --surface: #ffffff;
-  --panel: #ecf1f1;
-  --text: #14222b;
-  --muted: #5d7079;
-  --line: #dce4e5;
-  --accent: #0d7c75;
-  --accent-weak: #dff3f0;
+  --panel: #e8efe5;
+  --text: #14281c;
+  --muted: #5a7062;
+  --line: #d8e4d4;
+  --accent: #17794a;
+  --accent-weak: #ddf1e6;
+  --amber: #f59e0b;
+  --amber-weak: #fff1d0;
   --danger: #d6402b;
   --danger-weak: #fde9e5;
   --ok: #17803d;
-  --ok-weak: #e3f5ea;
-  --shadow: 0 1px 2px rgba(10, 40, 45, .06), 0 2px 8px rgba(10, 40, 45, .05);
-  --radius: 10px;
+  --ok-weak: #dff3e6;
+  --shadow: 0 1px 2px rgba(15, 50, 30, .06), 0 3px 10px rgba(15, 50, 30, .06);
+  --radius: 12px;
   /* HTTP methods and JSON types: one base colour each, the soft background is mixed from it */
-  --m-get: #0b6fa8;
+  --m-get: #0b6fb3;
   --m-post: #17803d;
   --m-put: #b45f06;
   --m-delete: #d6402b;
-  --t-string: #0d7c75;
+  --t-string: #17794a;
   --t-number: #b45f06;
   --t-boolean: #c2255c;
-  --t-null: #5d7079;
-  --t-array: #0b6fa8;
+  --t-null: #5a7062;
+  --t-array: #0b6fb3;
   --t-object: #3d5a80;
+  /* faint contour lines, used as a texture in headers */
+  --topo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 120'%3E%3Cg fill='none' stroke='%2317794a' stroke-opacity='.26' stroke-width='2'%3E%3Cpath d='M0 62 C70 12 130 104 200 54 S330 22 390 64 S520 98 600 44'/%3E%3Cpath d='M0 78 C70 28 130 120 200 70 S330 38 390 80 S520 114 600 60'/%3E%3Cpath d='M0 46 C70 -4 130 88 200 38 S330 6 390 48 S520 82 600 28'/%3E%3Cpath d='M0 94 C70 44 130 136 200 86 S330 54 390 96 S520 130 600 76'/%3E%3C/g%3E%3C/svg%3E");
+  --topo-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 120'%3E%3Cg fill='none' stroke='%2317794a' stroke-opacity='.11' stroke-width='2'%3E%3Cpath d='M0 62 C70 12 130 104 200 54 S330 22 390 64 S520 98 600 44'/%3E%3Cpath d='M0 78 C70 28 130 120 200 70 S330 38 390 80 S520 114 600 60'/%3E%3Cpath d='M0 46 C70 -4 130 88 200 38 S330 6 390 48 S520 82 600 28'/%3E%3Cpath d='M0 94 C70 44 130 136 200 86 S330 54 390 96 S520 130 600 76'/%3E%3C/g%3E%3C/svg%3E");
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d1519;
-    --surface: #131d22;
-    --panel: #1a262c;
-    --text: #e5eef0;
-    --muted: #92a8b0;
-    --line: #26363d;
-    --accent: #3cc9bd;
-    --accent-weak: #11332f;
+    --bg: #0c1410;
+    --surface: #121c16;
+    --panel: #19261e;
+    --text: #e3eee6;
+    --muted: #8fa798;
+    --line: #25362b;
+    --accent: #46d192;
+    --accent-weak: #10301f;
+    --amber: #fbbf24;
+    --amber-weak: #3a2c0a;
     --danger: #ff7a66;
     --danger-weak: #3a1f1b;
     --ok: #5fd08a;
-    --ok-weak: #153122;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    --ok-weak: #123122;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .45);
     --m-get: #5bb8ee;
     --m-post: #5fd08a;
     --m-put: #f2b25c;
     --m-delete: #ff7a66;
-    --t-string: #3cc9bd;
+    --t-string: #46d192;
     --t-number: #f2b25c;
     --t-boolean: #f472a8;
-    --t-null: #92a8b0;
+    --t-null: #8fa798;
     --t-array: #5bb8ee;
     --t-object: #9bb4d8;
+    --topo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 120'%3E%3Cg fill='none' stroke='%2346d192' stroke-opacity='.30' stroke-width='2'%3E%3Cpath d='M0 62 C70 12 130 104 200 54 S330 22 390 64 S520 98 600 44'/%3E%3Cpath d='M0 78 C70 28 130 120 200 70 S330 38 390 80 S520 114 600 60'/%3E%3Cpath d='M0 46 C70 -4 130 88 200 38 S330 6 390 48 S520 82 600 28'/%3E%3Cpath d='M0 94 C70 44 130 136 200 86 S330 54 390 96 S520 130 600 76'/%3E%3C/g%3E%3C/svg%3E");
+    --topo-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 120'%3E%3Cg fill='none' stroke='%2346d192' stroke-opacity='.13' stroke-width='2'%3E%3Cpath d='M0 62 C70 12 130 104 200 54 S330 22 390 64 S520 98 600 44'/%3E%3Cpath d='M0 78 C70 28 130 120 200 70 S330 38 390 80 S520 114 600 60'/%3E%3Cpath d='M0 46 C70 -4 130 88 200 38 S330 6 390 48 S520 82 600 28'/%3E%3Cpath d='M0 94 C70 44 130 136 200 86 S330 54 390 96 S520 130 600 76'/%3E%3C/g%3E%3C/svg%3E");
   }
 }
 
@@ -61,18 +70,18 @@
 body { margin: 0; background: var(--bg); color: var(--text); }
 button, input, select { font: inherit; color: inherit; }
 button {
-  padding: 7px 14px; border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 14px; border: 1px solid var(--line); border-radius: 10px;
   background: var(--surface); cursor: pointer; transition: border-color .12s, background .12s;
 }
 button:hover { border-color: var(--accent); background: var(--accent-weak); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-button.primary:hover { filter: brightness(1.1); background: var(--accent); }
-@media (prefers-color-scheme: dark) { button.primary { color: #062421; } }
+button.primary:hover { filter: brightness(1.12); background: var(--accent); }
+@media (prefers-color-scheme: dark) { button.primary { color: #05231a; } }
 button.danger { color: var(--danger); }
 button.danger:hover { border-color: var(--danger); background: var(--danger-weak); }
 button:disabled { opacity: .5; cursor: default; }
 input[type=text], input[type=search], select {
-  padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  padding: 7px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
 }
 input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=checkbox] { accent-color: var(--accent); }

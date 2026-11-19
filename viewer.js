@@ -153,7 +153,7 @@ function renderStepList() {
     class: `item${g.index === state.step ? ' selected' : ''}`,
     onclick: () => { state.step = g.index; render(); },
   },
-  h('div', { class: 'top' }, h('span', { class: 'path' }, g.index === null ? g.label : `${g.index + 1}. ${g.label}`)),
+  h('div', { class: 'top' }, h('span', { class: g.index === null ? 'wp wp-start' : 'wp' }, g.index === null ? '' : String(g.index + 1)), h('span', { class: 'path' }, g.label)),
   h('div', { class: 'meta' }, `${plural(g.calls.filter(isApiCall).length, 'API call')}${g.at ? ` · ${new Date(g.at).toLocaleTimeString()}` : ''}`))));
 }
 
@@ -164,7 +164,7 @@ function renderStepDetail() {
   const calls = g.calls.filter((c) => (!state.apiOnly || isApiCall(c)) && store.endpoints[c.key]);
   const t0 = g.at ? Date.parse(g.at) : (g.calls[0]?.at ?? 0);
   right.replaceChildren(h('div', { class: 'detail' },
-    h('div', { class: 'title' }, h('h2', {}, g.index === null ? g.label : `Step ${g.index + 1}: ${g.label}`)),
+    h('div', { class: 'title' }, h('span', { class: g.index === null ? 'wp wp-start' : 'wp' }, g.index === null ? '' : String(g.index + 1)), h('h2', {}, g.index === null ? g.label : g.label)),
     h('div', { class: 'sub muted' }, `${g.at ? `${time(g.at)} · ` : ''}${plural(calls.length, 'call')} shown`),
     h('div', { class: 'tools' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.apiOnly, onchange: (e) => { state.apiOnly = e.target.checked; render(); } }), ' API calls only (XHR and fetch)')),
     h('div', { class: 'panel' }, h('div', { class: 'tablewrap' }, h('table', {},

@@ -1,18 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <defs>
-    <linearGradient id="brace" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2dd4bf"/>
-      <stop offset="1" stop-color="#0d7c75"/>
-    </linearGradient>
-  </defs>
-  <g fill="none" stroke="url(#brace)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M44 20 C31 20 29 28 29 40 L29 53 C29 60 25 64 14 64 C25 64 29 68 29 75 L29 88 C29 100 31 108 44 108"/>
-    <path d="M84 20 C97 20 99 28 99 40 L99 53 C99 60 103 64 114 64 C103 64 99 68 99 75 L99 88 C99 100 97 108 84 108"/>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fd69c"/><stop offset="1" stop-color="#1b8a56"/></linearGradient></defs>
+  <g fill="none" stroke="url(#g)" stroke-width="9" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M58 10 C92 8 120 34 116 68 C112 100 80 120 50 112 C22 104 8 78 14 50 C20 24 36 12 58 10Z"/>
+    <path d="M72 28 C94 28 106 48 102 68 C98 88 78 100 58 94 C38 88 30 68 38 52 C44 38 56 28 72 28Z"/>
   </g>
-  <!-- survey marker: ring with crosshair ticks and a centre point -->
-  <g fill="none" stroke="#ff6a4d" stroke-width="4.5" stroke-linecap="round">
-    <circle cx="64" cy="64" r="14"/>
-    <path d="M64 36 V50 M64 78 V92 M36 64 H50 M78 64 H92"/>
-  </g>
-  <circle cx="64" cy="64" r="4.8" fill="#ff6a4d"/>
+  <path d="M74 38 a15 15 0 0 1 15 15 c0 11 -15 21 -15 21 s-15 -10 -15 -21 a15 15 0 0 1 15 -15z" fill="#f59e0b"/>
+  <circle cx="74" cy="53" r="5.5" fill="#fff"/>
 </svg>

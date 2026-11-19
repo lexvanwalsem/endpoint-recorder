@@ -12,10 +12,10 @@
 
 <p align="center">
   <a href="https://github.com/lexvanwalsem/surveyor/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/lexvanwalsem/surveyor/actions/workflows/test.yml/badge.svg"></a>
-  <img alt="Chrome extension, Manifest V3" src="https://img.shields.io/badge/Chrome-Manifest%20V3-0d7c75">
-  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-0d7c75">
-  <img alt="Local only" src="https://img.shields.io/badge/data-stays%20on%20your%20computer-0d7c75">
-  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-0d7c75">
+  <img alt="Chrome extension, Manifest V3" src="https://img.shields.io/badge/Chrome-Manifest%20V3-17794a">
+  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-17794a">
+  <img alt="Local only" src="https://img.shields.io/badge/data-stays%20on%20your%20computer-17794a">
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-17794a">
 </p>
 
 <p align="center">
