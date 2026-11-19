@@ -7,7 +7,14 @@
 <link rel="stylesheet" href="styles.css">
 <style>
   body { width: 370px; padding: 16px; font-size: 15px; }
-  body { background: var(--bg) var(--topo-soft) 0 0 / 900px 360px repeat; }
+  body { position: relative; }
+  body > * { position: relative; }
+  body::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 120px;
+    background: var(--topo) 0 0 / 900px 360px repeat;
+    -webkit-mask-image: linear-gradient(to bottom, #000, transparent); mask-image: linear-gradient(to bottom, #000, transparent);
+    pointer-events: none;
+  }
   .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
   .brand { display: flex; align-items: center; gap: 10px; }
   .brand img { display: block; }
