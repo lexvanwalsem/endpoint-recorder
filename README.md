@@ -14,9 +14,21 @@ After changing code: press the refresh icon on the extension card.
    Chrome shows a bar "Endpoint Recorder started debugging this browser": leave it open, closing it stops the recording.
 2. Do the normal work in the system (open a ticket, reply to a mail, close a chat). No reload is needed; only calls made
    after you pressed the button are seen. "Reload tab" also catches the calls made while the page loads.
-3. Click the icon again: a live list shows the endpoints with their call counts.
+3. Click the icon again: a live list shows the busiest endpoints. "Open full view" opens a page in its own tab with
+   everything written out (see below).
 4. "Export Markdown" for reading, "Export JSON" for further processing. "Stop recording this tab" ends it, "Clear" empties
    the recording. Data lives in `chrome.storage.local` and is shared by all tabs you recorded.
+
+## Full view
+A page (`viewer.html`) that updates live while you record.
+- Left: every endpoint with method, path, host, call count, average time and an error badge. Search matches path, host,
+  field names and example values. Filter on method, host, only errors, only endpoints with a JSON body. Sort on calls,
+  slowest, most recent or name.
+- Right: details of the selected endpoint (calls, average and slowest time, first and last seen, status codes, query
+  parameter names) and the request and response fields with type, how often each field is present and examples.
+  A field filter narrows the table down.
+- Export: "Export Markdown" and "Export JSON" at the top only contain the endpoints that match the current filters.
+  Per endpoint there is "Copy as Markdown" and "Download JSON".
 
 ## How it works
 The extension attaches the Chrome debugger to the tab and listens to its Network events, the same source as the

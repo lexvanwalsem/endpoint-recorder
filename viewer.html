@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endpoint Recorder</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+<header>
+  <div class="logo" aria-hidden="true">{ }</div>
+  <h1>Endpoint Recorder</h1>
+  <div id="summary"></div>
+  <span class="spacer"></span>
+  <button id="exportMd" title="Markdown of the endpoints that match the filters">Export Markdown</button>
+  <button id="exportJson" title="JSON of the endpoints that match the filters">Export JSON</button>
+  <button id="clear" class="danger">Clear all</button>
+</header>
+<main>
+  <section id="left">
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search path, host, field name or example value">
+      <div class="row">
+        <select id="method"><option value="">All methods</option></select>
+        <select id="host"><option value="">All hosts</option></select>
+        <select id="sort">
+          <option value="count">Most calls</option>
+          <option value="avg">Slowest</option>
+          <option value="recent">Most recent</option>
+          <option value="name">Name</option>
+        </select>
+      </div>
+      <div class="row">
+        <label><input id="errorsOnly" type="checkbox"> Only errors</label>
+        <label><input id="withBody" type="checkbox"> Only with JSON body</label>
+        <span id="count" class="muted" style="margin-left:auto"></span>
+      </div>
+    </div>
+    <div id="list"></div>
+  </section>
+  <section id="right"></section>
+</main>
+<script type="module" src="viewer.js"></script>
+</body>
+</html>

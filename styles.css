@@ -1,0 +1,108 @@
+/* Shared by popup.html and viewer.html. Colours are tokens; dark mode follows the browser. */
+:root {
+  color-scheme: light dark;
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --panel: #f0f2f8;
+  --text: #19202e;
+  --muted: #6a7387;
+  --line: #e3e6ee;
+  --accent: #4f46e5;
+  --accent-weak: #ecebfd;
+  --danger: #d92d20;
+  --danger-weak: #fdecea;
+  --ok: #15803d;
+  --ok-weak: #e6f5ec;
+  --shadow: 0 1px 2px rgba(20, 28, 50, .06), 0 2px 8px rgba(20, 28, 50, .05);
+  --radius: 10px;
+  /* methods and JSON types: one base colour each, the soft background is mixed from it */
+  --m-get: #2563eb;
+  --m-post: #15803d;
+  --m-put: #b45309;
+  --m-delete: #d92d20;
+  --t-string: #0d9488;
+  --t-number: #b45309;
+  --t-boolean: #7c3aed;
+  --t-null: #6a7387;
+  --t-array: #2563eb;
+  --t-object: #4f46e5;
+  font: 13.5px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f131a;
+    --surface: #171c26;
+    --panel: #1e2431;
+    --text: #e8ebf2;
+    --muted: #97a1b5;
+    --line: #2a3141;
+    --accent: #8b85ff;
+    --accent-weak: #25264a;
+    --danger: #ff6b60;
+    --danger-weak: #3b1f22;
+    --ok: #5fd08a;
+    --ok-weak: #17301f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    --m-get: #6ea0ff;
+    --m-post: #5fd08a;
+    --m-put: #f0b050;
+    --m-delete: #ff6b60;
+    --t-string: #4fd1c0;
+    --t-number: #f0b050;
+    --t-boolean: #b79bff;
+    --t-null: #97a1b5;
+    --t-array: #6ea0ff;
+    --t-object: #8b85ff;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+button, input, select { font: inherit; color: inherit; }
+button {
+  padding: 7px 14px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); cursor: pointer; transition: border-color .12s, background .12s;
+}
+button:hover { border-color: var(--accent); background: var(--accent-weak); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.danger { color: var(--danger); }
+button.danger:hover { border-color: var(--danger); background: var(--danger-weak); }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text], input[type=search], select {
+  padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+}
+input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type=checkbox] { accent-color: var(--accent); }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; }
+
+.pill {
+  display: inline-block; padding: 0 8px; border-radius: 999px; background: var(--panel);
+  font-size: 11.5px; line-height: 20px; white-space: nowrap;
+}
+.pill.err { background: var(--danger-weak); color: var(--danger); font-weight: 600; }
+.pill.ok { background: var(--ok-weak); color: var(--ok); font-weight: 600; }
+.pill.t { background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c); font-weight: 600; }
+.t-string { --c: var(--t-string); }
+.t-number { --c: var(--t-number); }
+.t-boolean { --c: var(--t-boolean); }
+.t-null { --c: var(--t-null); }
+.t-array { --c: var(--t-array); }
+.t-object { --c: var(--t-object); }
+.t-undefined { --c: var(--t-null); }
+
+.mpill {
+  display: inline-block; min-width: 52px; text-align: center; padding: 1px 8px; border-radius: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .03em; line-height: 18px;
+  background: color-mix(in srgb, var(--c) 15%, transparent); color: var(--c); --c: var(--m-get);
+}
+.mpill.POST { --c: var(--m-post); }
+.mpill.PUT, .mpill.PATCH { --c: var(--m-put); }
+.mpill.DELETE { --c: var(--m-delete); }
+.rec-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); margin-right: 7px;
+  box-shadow: 0 0 0 0 var(--danger); animation: pulse 1.6s infinite;
+}
+@keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }

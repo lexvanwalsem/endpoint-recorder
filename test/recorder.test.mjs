@@ -48,3 +48,14 @@ test('non-json bodies are ignored and markdown renders', () => {
   assert.match(md, /Request body/);
   assert.doesNotMatch(md, /Response body/);
 });
+
+test('toMarkdown can be limited to chosen endpoints', () => {
+  const store = createStore();
+  addEntry(store, entry('https://a.example/one', { a: 1 }));
+  addEntry(store, entry('https://a.example/two', { b: 1 }));
+  const only = Object.values(store.endpoints).find((e) => e.path === '/two').key;
+  const md = toMarkdown(store, [only]);
+  assert.match(md, /a\.example\/two/);
+  assert.doesNotMatch(md, /a\.example\/one/);
+  assert.match(md, /Recorded endpoints \(1\)/);
+});

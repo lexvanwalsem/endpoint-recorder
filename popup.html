@@ -1,42 +1,48 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Endpoint Recorder</title>
+<link rel="stylesheet" href="styles.css">
 <style>
-  :root { color-scheme: light dark; font: 13px system-ui, sans-serif; }
-  body { margin: 0; padding: 12px; width: 380px; }
-  h1 { font-size: 14px; margin: 0 0 4px; }
-  .row { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
-  button { padding: 5px 10px; }
-  button.primary { flex: 1; padding: 8px; font-weight: 600; }
-  .rec { color: #c62828; font-weight: 600; }
-  .muted { opacity: .7; }
-  .err { color: #c62828; }
-  label { display: block; margin: 8px 0; }
-  #list { max-height: 220px; overflow: auto; border-top: 1px solid #8884; margin-top: 8px; }
-  #list div { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid #8882; font-size: 12px; }
-  #list .n { min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
-  #list .u { word-break: break-all; }
+  body { width: 380px; padding: 14px; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  h1 { font-size: 15px; margin: 0; }
+  .site { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status { margin: 10px 0; padding: 8px 10px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+  .status.on { background: var(--danger-weak); border-color: transparent; }
+  .status .big { font-weight: 600; }
+  .actions { display: flex; gap: 8px; }
+  .actions button { flex: 1; }
+  #list { margin-top: 10px; border-top: 1px solid var(--line); max-height: 190px; overflow: auto; }
+  #list div { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  #list .n { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  #list .u { overflow-wrap: anywhere; }
+  .more { display: grid; gap: 6px; margin-top: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .err { color: var(--danger); margin-top: 6px; }
+  .note { font-size: 11px; margin-top: 4px; }
 </style>
 </head>
 <body>
-<h1>Endpoint Recorder</h1>
-<div id="site" class="muted"></div>
-<div class="row">
+<div class="top"><h1>Endpoint Recorder</h1><span id="site" class="muted site"></span></div>
+<div class="actions">
   <button id="toggle" class="primary"></button>
   <button id="reload" title="Reload this tab so the calls made while the page loads are caught too">Reload tab</button>
 </div>
 <div id="error" class="err"></div>
-<div id="state"></div>
+<div id="state" class="status"></div>
+<button id="open" style="width:100%">Open full view: search, filter, details and export</button>
 <div id="list"></div>
-<label><input id="examples" type="checkbox"> Keep example values</label>
-<div class="muted">Off: only field names and types are kept. Examples can contain customer data.
-While recording, Chrome shows a bar "started debugging this browser": leave it open.</div>
-<div class="row">
-  <button id="md">Export Markdown</button>
-  <button id="json">Export JSON</button>
-  <button id="clear">Clear</button>
+<div class="more">
+  <label><input id="examples" type="checkbox"> Keep example values</label>
+  <div class="muted note">Off: only field names and types are kept. Examples can contain customer data.
+    While recording, Chrome shows a bar "started debugging this browser": leave it open.</div>
+  <div class="row">
+    <button id="md">Export Markdown</button>
+    <button id="json">Export JSON</button>
+    <button id="clear" class="danger">Clear</button>
+  </div>
 </div>
 <script type="module" src="popup.js"></script>
 </body>

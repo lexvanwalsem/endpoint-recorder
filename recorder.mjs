@@ -121,8 +121,9 @@ function table(node) {
   return out;
 }
 
-export function toMarkdown(store) {
-  const eps = Object.values(store.endpoints).sort((a, b) => b.count - a.count);
+/** Markdown report. `only` (optional): array of endpoint keys to include. */
+export function toMarkdown(store, only) {
+  const eps = Object.values(store.endpoints).filter((ep) => !only || only.includes(ep.key)).sort((a, b) => b.count - a.count);
   const lines = [`# Recorded endpoints (${eps.length})`, '', `Recording started ${store.started}.`, ''];
   for (const ep of eps) {
     lines.push(`## ${ep.method} ${ep.host}${ep.path}${ep.rpc ? ` [${ep.rpc}]` : ''}`, '');
