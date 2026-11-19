@@ -9,11 +9,12 @@ try { host = new URL(tab.url).host; } catch { /* no usable tab */ }
 $('site').textContent = host || tab?.title || 'unknown tab';
 
 async function render() {
-  const { store, recording, keepExamples } = await send({ type: 'get', tabId: tab.id });
+  const { store, recording, keepExamples, allTypes } = await send({ type: 'get', tabId: tab.id });
   const eps = Object.values(store.endpoints).sort((a, b) => b.count - a.count);
   $('toggle').textContent = recording ? 'Stop recording this tab' : 'Record this tab';
   $('toggle').classList.toggle('primary', !recording);
-  $('examples').checked = keepExamples;
+  if (document.activeElement !== $('examples')) $('examples').checked = keepExamples;
+  if (document.activeElement !== $('allTypes')) $('allTypes').checked = allTypes;
 
   const calls = eps.reduce((s, e) => s + e.count, 0);
   const line = document.createElement('div');
@@ -48,7 +49,9 @@ $('toggle').onclick = async () => {
 };
 
 $('reload').onclick = () => chrome.tabs.reload(tab.id);
-$('examples').onchange = () => send({ type: 'setExamples', value: $('examples').checked });
+const saveSettings = () => send({ type: 'setSettings', keepExamples: $('examples').checked, allTypes: $('allTypes').checked });
+$('examples').onchange = saveSettings;
+$('allTypes').onchange = saveSettings;
 
 $('open').onclick = async () => {
   const url = chrome.runtime.getURL('viewer.html');

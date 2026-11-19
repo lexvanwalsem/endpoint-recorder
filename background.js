@@ -13,13 +13,22 @@ function enqueue(fn) {
 const recordingTabs = async () => (await chrome.storage.session.get('tabs')).tabs ?? [];
 const setRecordingTabs = (tabs) => chrome.storage.session.set({ tabs });
 
+// Settings are cached because they are needed for every network event.
+let settings = { keepExamples: false, allTypes: false };
+const settingsReady = chrome.storage.local.get('settings').then((saved) => { settings = { ...settings, ...saved.settings }; });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.settings) settings = { keepExamples: false, allTypes: false, ...changes.settings.newValue };
+});
+
 async function load() {
-  const { store, settings } = await chrome.storage.local.get(['store', 'settings']);
-  return { store: store ?? createStore(), keepExamples: Boolean(settings?.keepExamples) };
+  await settingsReady;
+  const { store } = await chrome.storage.local.get('store');
+  return { store: store ?? createStore(), keepExamples: settings.keepExamples, allTypes: settings.allTypes };
 }
 
 const capture = createCapture({
   getBody: (tabId, requestId) => chrome.debugger.sendCommand({ tabId }, 'Network.getResponseBody', { requestId }),
+  wantAll: () => settings.allTypes,
   onEntry: (entry) => enqueue(async () => {
     if (!/^https?:/.test(entry.url)) return;
     const { store, keepExamples } = await load();
@@ -29,6 +38,7 @@ const capture = createCapture({
 });
 
 chrome.debugger.onEvent.addListener(async (source, method, params) => {
+  await settingsReady;
   if (source.tabId !== undefined && (await recordingTabs()).includes(source.tabId)) capture.handle(source.tabId, method, params);
 });
 
@@ -50,7 +60,7 @@ chrome.tabs.onUpdated.addListener(async (tabId) => {
 
 function showBadge(tabId) {
   chrome.action.setBadgeText({ tabId, text: 'REC' }).catch(() => {});
-  chrome.action.setBadgeBackgroundColor({ tabId, color: '#c62828' }).catch(() => {});
+  chrome.action.setBadgeBackgroundColor({ tabId, color: '#d92d20' }).catch(() => {});
 }
 
 async function start(tabId) {
@@ -82,8 +92,8 @@ async function handle(msg) {
     case 'clear':
       await chrome.storage.local.set({ store: createStore() });
       return null;
-    case 'setExamples':
-      await chrome.storage.local.set({ settings: { keepExamples: Boolean(msg.value) } });
+    case 'setSettings':
+      await chrome.storage.local.set({ settings: { keepExamples: Boolean(msg.keepExamples), allTypes: Boolean(msg.allTypes) } });
       return null;
     default:
       return null;

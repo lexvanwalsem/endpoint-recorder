@@ -1,9 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Endpoint Recorder",
-  "version": "0.5.0",
-  "description": "Records the XHR/fetch endpoints of one browser tab, with request and response field structure. Switch it on per tab from the toolbar icon.",
-  "action": { "default_title": "Endpoint Recorder", "default_popup": "popup.html" },
+  "version": "0.7.0",
+  "description": "Records the network calls of one browser tab and shows endpoints, fields, content types, sizes and real example responses. Switch it on per tab from the toolbar icon.",
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "action": {
+    "default_title": "Endpoint Recorder",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
+  },
   "background": { "service_worker": "background.js", "type": "module" },
   "permissions": ["debugger", "storage", "activeTab"]
 }

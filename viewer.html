@@ -4,26 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Endpoint Recorder</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="viewer.css">
 </head>
 <body>
 <header>
-  <div class="logo" aria-hidden="true">{ }</div>
+  <img class="logo" src="icons/icon-48.png" width="34" height="34" alt="">
   <h1>Endpoint Recorder</h1>
   <div id="summary"></div>
   <span class="spacer"></span>
-  <button id="exportMd" title="Markdown of the endpoints that match the filters">Export Markdown</button>
-  <button id="exportJson" title="JSON of the endpoints that match the filters">Export JSON</button>
-  <button id="clear" class="danger">Clear all</button>
+  <div class="actions">
+    <button id="exportMd" title="Markdown of the endpoints that match the filters">Export Markdown</button>
+    <button id="exportJson" title="JSON of the endpoints that match the filters">Export JSON</button>
+    <button id="clear" class="danger">Clear all</button>
+  </div>
 </header>
 <main>
   <section id="left">
     <div class="filters">
       <input id="q" type="search" placeholder="Search path, host, field name or example value">
-      <div class="row">
+      <div class="selects">
         <select id="method"><option value="">All methods</option></select>
         <select id="host"><option value="">All hosts</option></select>
+        <select id="type"><option value="">All types</option></select>
         <select id="sort">
           <option value="count">Most calls</option>
           <option value="avg">Slowest</option>

@@ -1,8 +1,11 @@
 {
   "name": "endpoint-recorder",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "private": true,
-  "description": "Chrome DevTools panel that records the endpoints a web app calls and their field structure.",
+  "license": "MIT",
+  "description": "Chrome extension that records the network calls of one tab and builds a map of endpoints, fields and real example responses.",
   "type": "module",
+  "repository": { "type": "git", "url": "git+https://github.com/lexvanwalsem/endpoint-recorder.git" },
+  "engines": { "node": ">=20" },
   "scripts": { "test": "node --test test/" }
 }

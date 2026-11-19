@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, createStore, flatten, normalizePath, rpcHint, toMarkdown } from '../recorder.mjs';
+import { addEntry, createStore, flatten, formatBytes, normalizeMime, normalizePath, rpcHint, toMarkdown } from '../recorder.mjs';
 
 test('normalizePath replaces ids but keeps words', () => {
   assert.equal(normalizePath('/api/tickets/12345/messages'), '/api/tickets/{id}/messages');
@@ -45,8 +45,8 @@ test('non-json bodies are ignored and markdown renders', () => {
   addEntry(store, entry('https://a.example/h', null, { resText: '<html>', resMime: 'text/html' }));
   const md = toMarkdown(store);
   assert.match(md, /POST a\.example\/h/);
-  assert.match(md, /Request body/);
-  assert.doesNotMatch(md, /Response body/);
+  assert.match(md, /Request fields/);
+  assert.doesNotMatch(md, /Response fields/);
 });
 
 test('toMarkdown can be limited to chosen endpoints', () => {
@@ -58,4 +58,28 @@ test('toMarkdown can be limited to chosen endpoints', () => {
   assert.match(md, /a\.example\/two/);
   assert.doesNotMatch(md, /a\.example\/one/);
   assert.match(md, /Recorded endpoints \(1\)/);
+});
+
+test('sample calls are kept only with examples on, with full url, and shortened', () => {
+  const big = { list: Array.from({ length: 10 }, (_, i) => ({ id: i })), text: 'x'.repeat(300) };
+  const off = createStore();
+  addEntry(off, entry('https://a.example/r?from=2026-11-01', big));
+  assert.equal(Object.values(off.endpoints)[0].samples, undefined);
+
+  const on = createStore();
+  for (let i = 0; i < 5; i++) addEntry(on, entry(`https://a.example/r?n=${i}`, big), { keepExamples: true });
+  const ep = Object.values(on.endpoints)[0];
+  assert.equal(ep.samples.length, 3); // newest three
+  assert.equal(ep.samples[2].url, 'https://a.example/r?n=4');
+  assert.equal(ep.samples[2].res.list.length, 3);
+  assert.equal(ep.samples[2].res.text.length, 203);
+  assert.equal(ep.samples[2].cut, true);
+});
+
+test('markdown contains the example call with url and response', () => {
+  const store = createStore();
+  addEntry(store, entry('https://a.example/r?from=2026-11-01', { total: 5 }), { keepExamples: true });
+  const md = toMarkdown(store);
+  assert.match(md, /Example call: `POST https:\/\/a\.example\/r\?from=2026-11-01` -> 200/);
+  assert.match(md, /"total": 5/);
 });

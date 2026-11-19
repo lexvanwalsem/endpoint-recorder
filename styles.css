@@ -1,58 +1,59 @@
-/* Shared by popup.html and viewer.html. Colours are tokens; dark mode follows the browser. */
+/* Shared by popup.html and viewer.html. Colours are tokens; dark mode follows the browser.
+   Palette: deep teal as the accent on a cool neutral base, a warm coral for "recording" and errors. */
 :root {
   color-scheme: light dark;
-  --bg: #f5f6fa;
+  --bg: #f3f6f6;
   --surface: #ffffff;
-  --panel: #f0f2f8;
-  --text: #19202e;
-  --muted: #6a7387;
-  --line: #e3e6ee;
-  --accent: #4f46e5;
-  --accent-weak: #ecebfd;
-  --danger: #d92d20;
-  --danger-weak: #fdecea;
-  --ok: #15803d;
-  --ok-weak: #e6f5ec;
-  --shadow: 0 1px 2px rgba(20, 28, 50, .06), 0 2px 8px rgba(20, 28, 50, .05);
+  --panel: #ecf1f1;
+  --text: #14222b;
+  --muted: #5d7079;
+  --line: #dce4e5;
+  --accent: #0d7c75;
+  --accent-weak: #dff3f0;
+  --danger: #d6402b;
+  --danger-weak: #fde9e5;
+  --ok: #17803d;
+  --ok-weak: #e3f5ea;
+  --shadow: 0 1px 2px rgba(10, 40, 45, .06), 0 2px 8px rgba(10, 40, 45, .05);
   --radius: 10px;
-  /* methods and JSON types: one base colour each, the soft background is mixed from it */
-  --m-get: #2563eb;
-  --m-post: #15803d;
-  --m-put: #b45309;
-  --m-delete: #d92d20;
-  --t-string: #0d9488;
-  --t-number: #b45309;
-  --t-boolean: #7c3aed;
-  --t-null: #6a7387;
-  --t-array: #2563eb;
-  --t-object: #4f46e5;
-  font: 13.5px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* HTTP methods and JSON types: one base colour each, the soft background is mixed from it */
+  --m-get: #0b6fa8;
+  --m-post: #17803d;
+  --m-put: #b45f06;
+  --m-delete: #d6402b;
+  --t-string: #0d7c75;
+  --t-number: #b45f06;
+  --t-boolean: #c2255c;
+  --t-null: #5d7079;
+  --t-array: #0b6fa8;
+  --t-object: #3d5a80;
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f131a;
-    --surface: #171c26;
-    --panel: #1e2431;
-    --text: #e8ebf2;
-    --muted: #97a1b5;
-    --line: #2a3141;
-    --accent: #8b85ff;
-    --accent-weak: #25264a;
-    --danger: #ff6b60;
-    --danger-weak: #3b1f22;
+    --bg: #0d1519;
+    --surface: #131d22;
+    --panel: #1a262c;
+    --text: #e5eef0;
+    --muted: #92a8b0;
+    --line: #26363d;
+    --accent: #3cc9bd;
+    --accent-weak: #11332f;
+    --danger: #ff7a66;
+    --danger-weak: #3a1f1b;
     --ok: #5fd08a;
-    --ok-weak: #17301f;
+    --ok-weak: #153122;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4);
-    --m-get: #6ea0ff;
+    --m-get: #5bb8ee;
     --m-post: #5fd08a;
-    --m-put: #f0b050;
-    --m-delete: #ff6b60;
-    --t-string: #4fd1c0;
-    --t-number: #f0b050;
-    --t-boolean: #b79bff;
-    --t-null: #97a1b5;
-    --t-array: #6ea0ff;
-    --t-object: #8b85ff;
+    --m-put: #f2b25c;
+    --m-delete: #ff7a66;
+    --t-string: #3cc9bd;
+    --t-number: #f2b25c;
+    --t-boolean: #f472a8;
+    --t-null: #92a8b0;
+    --t-array: #5bb8ee;
+    --t-object: #9bb4d8;
   }
 }
 
@@ -65,7 +66,8 @@ button {
 }
 button:hover { border-color: var(--accent); background: var(--accent-weak); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.primary:hover { filter: brightness(1.1); background: var(--accent); }
+@media (prefers-color-scheme: dark) { button.primary { color: #062421; } }
 button.danger { color: var(--danger); }
 button.danger:hover { border-color: var(--danger); background: var(--danger-weak); }
 button:disabled { opacity: .5; cursor: default; }
@@ -75,11 +77,11 @@ input[type=text], input[type=search], select {
 input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=checkbox] { accent-color: var(--accent); }
 .muted { color: var(--muted); }
-.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 14.5px; }
 
 .pill {
   display: inline-block; padding: 0 8px; border-radius: 999px; background: var(--panel);
-  font-size: 11.5px; line-height: 20px; white-space: nowrap;
+  font-size: 13px; line-height: 22px; white-space: nowrap;
 }
 .pill.err { background: var(--danger-weak); color: var(--danger); font-weight: 600; }
 .pill.ok { background: var(--ok-weak); color: var(--ok); font-weight: 600; }
@@ -94,7 +96,7 @@ input[type=checkbox] { accent-color: var(--accent); }
 
 .mpill {
   display: inline-block; min-width: 52px; text-align: center; padding: 1px 8px; border-radius: 6px;
-  font-size: 11px; font-weight: 700; letter-spacing: .03em; line-height: 18px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .03em; line-height: 20px;
   background: color-mix(in srgb, var(--c) 15%, transparent); color: var(--c); --c: var(--m-get);
 }
 .mpill.POST { --c: var(--m-post); }
