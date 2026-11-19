@@ -196,6 +196,206 @@ export function describeFlow(store, groups, only) {
   }));
 }
 
+const METHOD_ORDER = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const errorsOf = (ep) => Object.entries(ep.statuses ?? {}).filter(([s]) => Number(s) >= 400).reduce((n, [, c]) => n + (Number(c) || 0), 0);
+
+function routeNode(name) {
+  return { name, children: new Map(), endpoints: [] };
+}
+
+function finishRoute(node, stepsOf) {
+  const children = [...node.children.values()].map((c) => finishRoute(c, stepsOf));
+  children.sort((a, b) => (a.name === '{id}') - (b.name === '{id}') || a.name.localeCompare(b.name)); // {id} last
+  const endpoints = node.endpoints
+    .sort((a, b) => METHOD_ORDER.indexOf(a.method) - METHOD_ORDER.indexOf(b.method) || a.rpc.localeCompare(b.rpc))
+    .map((ep) => ({ key: ep.key, method: ep.method, rpc: ep.rpc, count: ep.count, errors: errorsOf(ep), steps: [...(stepsOf.get(ep.key) ?? [])].sort((a, b) => a - b) }));
+  let out = { name: node.name, endpoints, children, count: 0, errors: 0 };
+  // a path segment without calls of its own and with one child is joined with it: /api/tickets instead of /api then /tickets
+  while (!out.endpoints.length && out.children.length === 1 && out.name !== '') {
+    const [only] = out.children;
+    out = { ...only, name: `${out.name}/${only.name}` };
+  }
+  out.count = out.endpoints.reduce((n, e) => n + e.count, 0) + out.children.reduce((n, c) => n + c.count, 0);
+  out.errors = out.endpoints.reduce((n, e) => n + e.errors, 0) + out.children.reduce((n, c) => n + c.errors, 0);
+  return out;
+}
+
+/**
+ * The internal routing of the API: the paths of all endpoints as a tree per host, with the methods seen on each path and
+ * the steps (numbers) that used them. keys: only these endpoints. groups: steps, to say which steps used an endpoint.
+ * -> [{ host, root: { name, endpoints: [{ key, method, rpc, count, errors, steps }], children: [...], count, errors } }]
+ */
+export function buildRouteTree(store, { keys, groups } = {}) {
+  const stepsOf = new Map();
+  for (const g of groups ?? []) {
+    if (g.index === null) continue;
+    for (const c of g.calls) stepsOf.set(c.key, (stepsOf.get(c.key) ?? new Set()).add(g.index + 1));
+  }
+  const hosts = new Map();
+  for (const ep of Object.values(store.endpoints)) {
+    if (keys && !keys.includes(ep.key)) continue;
+    if (!hosts.has(ep.host)) hosts.set(ep.host, routeNode(''));
+    let node = hosts.get(ep.host);
+    for (const seg of ep.path.split('/').filter(Boolean)) {
+      if (!node.children.has(seg)) node.children.set(seg, routeNode(seg));
+      node = node.children.get(seg);
+    }
+    node.endpoints.push({ ...ep, rpc: ep.rpc ?? '' });
+  }
+  return [...hosts].map(([host, root]) => ({ host, root: finishRoute(root, stepsOf) })).sort((a, b) => b.root.count - a.root.count);
+}
+
+const routeCalls = (endpoints) => endpoints
+  .map((e) => `${e.method}${e.rpc ? ` [${e.rpc}]` : ''} x${e.count}${e.steps.length ? ` (step ${e.steps.join(', ')})` : ''}`)
+  .join(', ');
+
+/** The route tree as indented Markdown lines. */
+export function routeTreeLines(trees) {
+  const lines = [];
+  const walk = (node, depth) => {
+    for (const child of node.children) {
+      lines.push(`${'  '.repeat(depth)}- /${child.name}${child.endpoints.length ? `  ${routeCalls(child.endpoints)}` : ''}`);
+      walk(child, depth + 1);
+    }
+  };
+  for (const { host, root } of trees) {
+    lines.push(`- ${host}${root.endpoints.length ? `  / ${routeCalls(root.endpoints)}` : ''}`);
+    walk(root, 1);
+  }
+  return lines;
+}
+
+export const GRAPH = { nodeW: 240, nodeH: 60, gapX: 140, gapY: 24, pad: 28 };
+
+/**
+ * A node graph of how the calls link together: a node per endpoint, an edge when a value returned by one endpoint was used
+ * in a request to another. Laid out in columns from left (where the data starts, such as the login) to right (what it leads to).
+ * -> { nodes: [{ key, method, path, rpc, host, count, errors, steps, layer, x, y }],
+ *      edges: [{ id, from, to, labels, count, example, back }], unlinked: [keys], width, height }
+ */
+export function buildGraph(store, { keys, groups } = {}) {
+  const ok = (key) => store.endpoints[key] && (!keys || keys.includes(key));
+
+  const firstN = new Map();
+  for (const c of store.calls ?? []) if (!firstN.has(c.key) || c.n < firstN.get(c.key)) firstN.set(c.key, c.n);
+  const order = (key) => firstN.get(key) ?? Infinity;
+
+  const edgeMap = new Map();
+  for (const c of Object.values(store.chains ?? {})) {
+    if (!ok(c.from.key) || !ok(c.to.key) || c.from.key === c.to.key) continue;
+    const id = `${c.from.key}>${c.to.key}`;
+    const e = edgeMap.get(id) ?? { id, from: c.from.key, to: c.to.key, labels: [], count: 0, example: c.example, back: false };
+    const label = `${c.from.path} -> ${c.to.where}`;
+    if (!e.labels.includes(label) && e.labels.length < 4) e.labels.push(label);
+    e.count += c.count;
+    edgeMap.set(id, e);
+  }
+  const edges = [...edgeMap.values()];
+
+  const linked = new Set(edges.flatMap((e) => [e.from, e.to]));
+  const nodeKeys = [...linked].sort((a, b) => order(a) - order(b));
+  const unlinked = Object.keys(store.endpoints).filter((k) => ok(k) && !linked.has(k)).sort((a, b) => order(a) - order(b));
+
+  // a link that points back to an endpoint still on the path being followed would make a loop: it is drawn, not used for the layout
+  const out = new Map(nodeKeys.map((k) => [k, []]));
+  for (const e of edges) out.get(e.from).push(e);
+  const state = new Map();
+  const visit = (u) => {
+    state.set(u, 1);
+    for (const e of out.get(u)) {
+      if (state.get(e.to) === 1) e.back = true;
+      else if (!state.has(e.to)) visit(e.to);
+    }
+    state.set(u, 2);
+  };
+  for (const k of nodeKeys) if (!state.has(k)) visit(k);
+
+  // column = the longest chain of links leading to the node
+  const layer = new Map(nodeKeys.map((k) => [k, 0]));
+  for (let i = 0; i < nodeKeys.length; i++) {
+    for (const e of edges) if (!e.back) layer.set(e.to, Math.max(layer.get(e.to), layer.get(e.from) + 1));
+  }
+  const columns = [];
+  for (const k of nodeKeys) (columns[layer.get(k)] ??= []).push(k);
+  for (let c = 0; c < columns.length; c++) columns[c] ??= [];
+
+  // within a column: order by the average position of the neighbours, to cross fewer lines
+  const pos = new Map();
+  const place = () => columns.forEach((col) => col.forEach((k, i) => pos.set(k, i)));
+  place();
+  const neighbours = (k, dir) => edges.filter((e) => !e.back && (dir === 'in' ? e.to === k : e.from === k)).map((e) => pos.get(dir === 'in' ? e.from : e.to));
+  const bary = (k, dir) => { const n = neighbours(k, dir); return n.length ? n.reduce((a, b) => a + b, 0) / n.length : pos.get(k); };
+  for (let sweep = 0; sweep < 4; sweep++) {
+    const dir = sweep % 2 === 0 ? 'in' : 'out';
+    const cols = dir === 'in' ? columns : [...columns].reverse();
+    for (const col of cols) { col.sort((a, b) => bary(a, dir) - bary(b, dir) || order(a) - order(b)); place(); }
+  }
+
+  const { nodeW, nodeH, gapX, gapY, pad } = GRAPH;
+  const tallest = Math.max(0, ...columns.map((c) => c.length));
+  const stepsOf = new Map();
+  for (const g of groups ?? []) {
+    if (g.index === null) continue;
+    for (const c of g.calls) stepsOf.set(c.key, (stepsOf.get(c.key) ?? new Set()).add(g.index + 1));
+  }
+  const nodes = [];
+  columns.forEach((col, c) => {
+    const offset = ((tallest - col.length) * (nodeH + gapY)) / 2;
+    col.forEach((key, i) => {
+      const ep = store.endpoints[key];
+      nodes.push({
+        key, method: ep.method, path: ep.path, rpc: ep.rpc ?? '', host: ep.host, count: ep.count, errors: errorsOf(ep),
+        steps: [...(stepsOf.get(key) ?? [])].sort((a, b) => a - b), layer: c,
+        x: pad + c * (nodeW + gapX), y: pad + offset + i * (nodeH + gapY),
+      });
+    });
+  });
+  return {
+    nodes, edges, unlinked,
+    width: pad * 2 + Math.max(1, columns.length) * nodeW + Math.max(0, columns.length - 1) * gapX,
+    height: pad * 2 + tallest * nodeH + Math.max(0, tallest - 1) * gapY,
+  };
+}
+
+/** For one node: everything that leads to it, everything it leads to, and one path from where the data starts to it. */
+export function lineage(graph, key) {
+  const forward = new Map();
+  const backward = new Map();
+  for (const e of graph.edges) {
+    if (e.back) continue;
+    (forward.get(e.from) ?? forward.set(e.from, []).get(e.from)).push(e);
+    (backward.get(e.to) ?? backward.set(e.to, []).get(e.to)).push(e);
+  }
+  const walk = (start, map, next) => {
+    const seen = new Set([start]);
+    const edgeIds = new Set();
+    const queue = [start];
+    while (queue.length) {
+      const u = queue.shift();
+      for (const e of map.get(u) ?? []) {
+        edgeIds.add(e.id);
+        if (!seen.has(next(e))) { seen.add(next(e)); queue.push(next(e)); }
+      }
+    }
+    return { seen, edgeIds };
+  };
+  const up = walk(key, backward, (e) => e.from);
+  const down = walk(key, forward, (e) => e.to);
+
+  // one path from a start of the data to the node: always step back to the predecessor in the furthest column
+  const layerOf = new Map(graph.nodes.map((n) => [n.key, n.layer]));
+  const path = [key];
+  let current = key;
+  for (let guard = 0; guard < graph.nodes.length; guard++) {
+    const preds = backward.get(current) ?? [];
+    if (!preds.length) break;
+    preds.sort((a, b) => layerOf.get(b.from) - layerOf.get(a.from) || b.count - a.count);
+    current = preds[0].from;
+    path.unshift(current);
+  }
+  return { keys: new Set([...up.seen, ...down.seen]), edgeIds: new Set([...up.edgeIds, ...down.edgeIds]), path };
+}
+
 const stepName = (index) => (index === null ? 'the start' : `step ${index + 1}`);
 
 /** One flow edge as a sentence. kind: 'needs' | 'inner' | 'gives'. */

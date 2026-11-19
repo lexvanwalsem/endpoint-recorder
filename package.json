@@ -1,6 +1,6 @@
 {
   "name": "surveyor",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "private": true,
   "license": "MIT",
   "description": "The missing manual for undocumented APIs: a Chrome extension that records the network calls of one tab and documents endpoints, fields, steps and data flow.",

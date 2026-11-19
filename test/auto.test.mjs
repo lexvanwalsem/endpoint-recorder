@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, createStore, markStep, toMarkdown } from '../recorder.mjs';
-import { addNav, describeCall, describeFlow, detectPolling, detectSteps, getSteps, nestCalls } from '../flow.mjs';
+import { addEntry, createStore, markStep, subOperations, toMarkdown } from '../recorder.mjs';
+import { addNav, buildGraph, buildRouteTree, describeCall, describeFlow, detectPolling, detectSteps, getSteps, lineage, nestCalls, routeTreeLines } from '../flow.mjs';
+import { graphqlFields } from '../recorder.mjs';
 
 const BASE = 1_000_000;
 
@@ -198,4 +199,93 @@ test('nested calls: a call that used a value from an earlier call in the same st
   assert.deepEqual(login.map((t) => t.depth), [0]);
   // values from an earlier step do not nest: the close call is a root of its own step
   assert.deepEqual(nestCalls(store, getSteps(store)[3].calls).map((t) => t.depth), [0]);
+});
+
+test('graph: calls become nodes, values travelling between them become edges, laid out from the start of the data to its end', () => {
+  const store = scenario();
+  const graph = buildGraph(store, { groups: getSteps(store) });
+  const byPath = Object.fromEntries(graph.nodes.map((n) => [`${n.method} ${n.path}`, n]));
+
+  assert.deepEqual(Object.keys(byPath).sort(), ['GET /api/tickets', 'GET /api/tickets/{id}', 'GET /api/tickets/{id}/messages', 'POST /api/login', 'POST /api/tickets/{id}/close']);
+  assert.equal(byPath['POST /api/login'].layer, 0);
+  assert.equal(byPath['GET /api/tickets'].layer, 1);
+  assert.equal(byPath['GET /api/tickets/{id}'].layer, 2);
+  assert.equal(byPath['GET /api/tickets/{id}/messages'].layer, 3);
+  assert.equal(byPath['POST /api/tickets/{id}/close'].layer, 3);
+  assert.ok(byPath['GET /api/tickets'].x > byPath['POST /api/login'].x);
+  assert.deepEqual(byPath['POST /api/login'].steps, [1]); // the step numbers that used the endpoint
+
+  const edge = graph.edges.find((e) => store.endpoints[e.from].path === '/api/tickets' && store.endpoints[e.to].path === '/api/tickets/{id}');
+  assert.deepEqual(edge.labels, ['$.items[].id -> path']);
+  assert.equal(graph.edges.every((e) => !e.back), true);
+  assert.deepEqual(graph.unlinked, []);
+});
+
+test('graph: the lineage of a node is the path from the login to it, with the side branches that belong to it', () => {
+  const store = scenario();
+  const graph = buildGraph(store);
+  const keyOf = (p, m = 'GET') => Object.values(store.endpoints).find((e) => e.path === p && e.method === m).key;
+  const close = lineage(graph, keyOf('/api/tickets/{id}/close', 'POST'));
+  assert.deepEqual(close.path.map((k) => store.endpoints[k].path), ['/api/login', '/api/tickets', '/api/tickets/{id}', '/api/tickets/{id}/close']);
+  assert.equal(close.keys.has(keyOf('/api/tickets/{id}/messages')), false); // a sibling is not part of its lineage
+
+  const ticket = lineage(graph, keyOf('/api/tickets/{id}'));
+  assert.equal(ticket.keys.has(keyOf('/api/tickets/{id}/messages')), true); // what it leads to
+  assert.equal(ticket.keys.has(keyOf('/api/login', 'POST')), true); // what leads to it
+});
+
+test('graph: endpoints without links are listed apart, a loop between endpoints does not break the layout', () => {
+  withClock((tick) => {
+    const store = createStore();
+    tick(0); call(store, 'GET', 'https://x.example/api/a', { aid: 'tok-aaaaaaaaaaaa' });
+    tick(100); call(store, 'GET', 'https://x.example/api/b?t=tok-aaaaaaaaaaaa', { bid: 'tok-bbbbbbbbbbbb' });
+    tick(200); call(store, 'GET', 'https://x.example/api/a?t=tok-bbbbbbbbbbbb', { aid: 'tok-cccccccccccc' }); // links back to a
+    tick(300); call(store, 'GET', 'https://x.example/api/lonely', {});
+    const graph = buildGraph(store);
+    assert.equal(graph.nodes.length, 2);
+    assert.equal(graph.edges.length, 2);
+    assert.equal(graph.edges.filter((e) => e.back).length, 1);
+    assert.deepEqual(graph.unlinked.map((k) => store.endpoints[k].path), ['/api/lonely']);
+    assert.ok(graph.width > 0 && graph.height > 0);
+  });
+});
+
+test('route tree: the paths of the API as a tree with methods, counts and steps', () => {
+  const store = scenario();
+  call(store, 'GET', 'https://x.example/api/customers/search?q=a', {});
+  const trees = buildRouteTree(store, { groups: getSteps(store) });
+  assert.deepEqual(routeTreeLines(trees), [
+    '- x.example',
+    '  - /api',
+    '    - /customers/search  GET x1 (step 5)',
+    '    - /login  POST x1 (step 1)',
+    '    - /tickets  GET x1 (step 2)',
+    '      - /{id}  GET x1 (step 3)',
+    '        - /close  POST x1 (step 4)',
+    '        - /messages  GET x1 (step 3)',
+  ]);
+});
+
+test('sub-operations: a JSON batch and a GraphQL query with several fields are split into their parts', () => {
+  assert.deepEqual(subOperations([{ method: 'getUser' }, { method: 'getOrders' }]), ['getUser', 'getOrders']);
+  assert.deepEqual(subOperations([{ operationName: 'A' }, {}]), ['A', '#2']);
+  assert.deepEqual(subOperations([{ method: 'only' }]), []);
+  assert.deepEqual(graphqlFields('{ me { id } orders(first: 5) { id name } ping }'), ['me', 'orders', 'ping']);
+  assert.deepEqual(graphqlFields('query Dash { a: user(id: 1) { id } b: orders { id } }'), ['user', 'orders']);
+  assert.deepEqual(graphqlFields('query { me { ...Frag friends { id } } }'), ['me']);
+  assert.deepEqual(subOperations({ query: '{ me { id } orders { id } }' }), ['me', 'orders']);
+  assert.deepEqual(subOperations({ query: '{ me { id } }' }), []); // one field: nothing to split
+  assert.deepEqual(subOperations({ some: 'thing' }), []);
+});
+
+test('sub-operations are stored on the endpoint and the call, and named in the report', () => {
+  withClock((tick) => {
+    const store = createStore();
+    tick(0);
+    addEntry(store, { method: 'POST', url: 'https://x.example/graphql', status: 200, timeMs: 5, type: 'Fetch', reqText: JSON.stringify({ query: '{ me { id } orders { id } }' }), reqMime: 'application/json', resText: '{}', resMime: 'application/json' }, { keepExamples: true });
+    const ep = Object.values(store.endpoints)[0];
+    assert.deepEqual(ep.subs, { me: 1, orders: 1 });
+    assert.deepEqual(store.calls[0].subs, ['me', 'orders']);
+    assert.match(toMarkdown(store), /- Contains sub-calls: me x1, orders x1/);
+  });
 });

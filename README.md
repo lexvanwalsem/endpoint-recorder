@@ -40,6 +40,8 @@ something you can read, search and share:
 - **Real example calls**: the full URL, what was sent, what came back, as formatted JSON.
 - **The story of what you did**: the calls grouped into steps that Surveyor finds and names by itself ("Open ticket", "Close ticket").
 - **How it fits together**: for each step what it needs from earlier steps and what it passes on, in plain sentences.
+- **A graph of the whole system**: every call as a block, lines for the values that travel between them, from the login to the data, with the side branches.
+- **The routing of the API** as a tree of paths, with the methods, counts and the steps that used each path.
 
 It works on any site, on a tab that is already open, without a proxy, certificates, command line or account.
 
@@ -123,6 +125,36 @@ When a value returned by one call (an id, a token, a code) is used again in a la
 is recorded. The **Flow overview** at the top of the Steps view then tells the story, step by step: what the step needs
 from earlier steps, what happens inside it and what it passes on, with links to the calls involved. That is the sequence
 you need to reproduce a workflow. The same links show on each endpoint.
+
+### See the whole system as a graph
+
+The **Graph** view draws every call as a block and every recognised value as a line from the call that returned it to the
+call that used it. The data starts on the left (a login, a search) and leads to what you see on the right, with the side
+branches in between. Click a block and the path that leads to it lights up, with the value on each line
+(`$.items[].orderId -> path`) and a breadcrumb from the start to that call, while everything unrelated fades. Blocks show
+which steps used them. Calls that are not linked to anything are listed underneath. Zoom with the buttons and scroll to
+move around.
+
+<p align="center">
+  <img src="docs/graph.png" alt="A node graph: the path from looking up a customer to the shipment lights up, with the value on each line" width="900">
+</p>
+
+### The routing of the API as a tree
+
+The **Map** view shows the paths of the API as a tree per host: `/api`, then `/tickets`, then `/{id}`, then `/messages` and
+`/close`. Every path shows the methods that were seen on it, how often, and the numbers of the steps that used it. Open
+and close branches, click a method to see that endpoint in detail. It is the internal routing of the API, reconstructed
+from what you did. The Markdown export has the same tree under **API map**.
+
+<p align="center">
+  <img src="docs/map.png" alt="The paths of the API as a tree with methods, counts and step numbers" width="900">
+</p>
+
+### Calls inside a call
+
+Some requests carry several operations: a JSON batch (an array of calls) or a GraphQL query with several fields.
+Surveyor splits them into their parts. The endpoint shows what it contains ("Contains sub-calls: me, openTickets, stats"),
+and in the Steps view the parts are listed under the request that carried them.
 
 ### Understand the data
 
@@ -261,6 +293,8 @@ hint, not proof: check them. The newest call that returned a value is taken as i
 - Step detection is a heuristic: calls made while you pause between clicks can end up in the wrong step, and two quick
   actions can end up in one. Mark steps yourself when it matters.
 - Step names are guesses from the method and path, not knowledge of the system.
+- The graph only shows calls that are linked by a value Surveyor could follow (see below). Other calls are listed apart.
+- Sub-calls are found in JSON batches (arrays) and in the root fields of GraphQL queries, not in other formats.
 - You only learn about what you click: calls you never trigger are not documented.
 - Chrome internal pages (`chrome://`) and the Chrome Web Store cannot be recorded.
 
@@ -284,7 +318,7 @@ npm test
 | `background.js` | Service worker: attaches the debugger, stores calls |
 | `capture.mjs` | Network events to finished calls (pure logic) |
 | `recorder.mjs` | Grouping, field inference, examples, value search, links between calls, Markdown report (pure logic) |
-| `flow.mjs` | Steps (marked and detected), polling, step names, the flow explanation (pure logic) |
+| `flow.mjs` | Steps (marked and detected), polling, step names, the flow explanation, the route tree and the graph layout (pure logic) |
 | `popup.html`, `popup.js` | Toolbar popup |
 | `viewer.html`, `viewer.js`, `viewer.css` | Full view page |
 | `styles.css` | Shared design tokens and components |

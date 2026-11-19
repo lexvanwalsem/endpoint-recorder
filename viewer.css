@@ -191,3 +191,56 @@ header::before {
 .nest { display: inline-block; width: 14px; height: 13px; margin-right: 8px; vertical-align: top; border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-radius: 0 0 0 6px; }
 .stepnote { padding: 2px 8px 10px; font-size: 13.5px; }
 .explain { margin: 0 0 10px; font-size: 13.5px; }
+
+/* Map: the routing of the API as a tree */
+.maphint { padding: 4px 12px 10px; font-size: 13.5px; }
+.maphost { padding: 10px 12px 4px; }
+.mapnode { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-top: 4px; padding-bottom: 4px; padding-right: 8px; }
+.mapname { font-weight: 600; cursor: pointer; }
+.mapep { display: inline-flex; align-items: center; gap: 5px; }
+.mapep .mpill { cursor: pointer; min-width: 0; }
+.mapep .mpill.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.small { font-size: 12.5px; }
+.caret { width: 14px; height: 14px; flex: none; cursor: pointer; position: relative; }
+.caret.none { cursor: default; }
+.caret.open::before, .caret.closed::before { content: ''; position: absolute; left: 3px; top: 3px; border: 5px solid transparent; }
+.caret.open::before { border-top-color: var(--muted); top: 5px; }
+.caret.closed::before { border-left-color: var(--muted); left: 5px; }
+.wp.mini { min-width: 18px; height: 18px; font-size: 11px; }
+
+/* Graph */
+.graphwrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin-top: 8px; max-height: 70vh; }
+.graph { display: block; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 2px; margin: 10px 0 0; }
+.crumb { padding: 2px 8px; border-radius: 6px; background: var(--panel); cursor: pointer; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.crumb.cur { background: var(--accent-weak); outline: 1px solid var(--accent); }
+.crumbs button { margin-left: 10px; padding: 3px 12px; font-size: 13.5px; }
+.unlinked { margin-top: 16px; }
+.unlinked .label { color: var(--muted); font-size: 13.5px; margin-bottom: 6px; }
+.subs { margin: 6px 0 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.subrow td { color: var(--muted); padding-top: 2px; padding-bottom: 6px; border-bottom: 0; }
+
+.gedge { fill: none; stroke: var(--muted); stroke-opacity: .55; stroke-width: 1.6; }
+.gedge.hi { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2.8; }
+.gedge.dim { stroke-opacity: .12; }
+.gedge.back { stroke-dasharray: 6 5; }
+.arrow-shape { fill: var(--muted); fill-opacity: .7; }
+.arrow-shape.hi { fill: var(--accent); fill-opacity: 1; }
+.glabel { font: 12px ui-monospace, Consolas, monospace; fill: var(--text); paint-order: stroke; stroke: var(--surface); stroke-width: 5px; stroke-linejoin: round; }
+.gnode { cursor: pointer; }
+.gnode .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; filter: drop-shadow(0 1px 2px rgba(15, 50, 30, .12)); }
+.gnode:hover .box { stroke: var(--accent); }
+.gnode.sel .box { stroke: var(--accent); stroke-width: 2.8; }
+.gnode.dim { opacity: .3; }
+.gnode text { font: 600 13px system-ui, sans-serif; fill: var(--text); }
+.gnode .gpath { font: 600 13.5px ui-monospace, Consolas, monospace; }
+.gnode .gmeta { font: 12px system-ui, sans-serif; fill: var(--muted); font-weight: 400; }
+.gm { --c: var(--m-get); }
+.gm.POST { --c: var(--m-post); }
+.gm.PUT, .gm.PATCH { --c: var(--m-put); }
+.gm.DELETE { --c: var(--m-delete); }
+.gm .pill { fill: color-mix(in srgb, var(--c) 16%, transparent); }
+.gm text { fill: var(--c); font-size: 12px; font-weight: 700; letter-spacing: .03em; }
+.gstep circle { fill: var(--amber); }
+.gstep text { fill: #2b1d00; font-size: 11px; font-weight: 800; }
+.gerr { fill: var(--danger); }

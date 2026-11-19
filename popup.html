@@ -21,7 +21,21 @@
   .brand img { display: block; }
   h1 { font-size: 17px; margin: 0; white-space: nowrap; }
   .site { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-  #toggle { width: 100%; padding: 11px; font-size: 16px; }
+  /* The record button: a calm card with a record dot, a thin amber edge and a soft glow instead of a solid block */
+  #toggle {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 12px 14px; font-size: 16px; font-weight: 650; border-radius: 14px; color: var(--text);
+  }
+  #toggle::before {
+    content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
+  }
+  #toggle.primary {
+    background: var(--surface); border: 1.5px solid var(--amber);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--amber) 26%, transparent);
+  }
+  #toggle.primary:hover { background: var(--amber-weak); filter: none; }
+  #toggle:not(.primary)::before { border-radius: 3px; background: var(--text); box-shadow: none; } /* stop square */
   .status { margin: 12px 0; display: flex; align-items: center; min-height: 24px; }
   .status.on { color: var(--danger); font-weight: 600; }
   .stepbox { margin: 0 0 12px; }

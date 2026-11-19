@@ -1,12 +1,12 @@
 // Full page view of the recording: search, filter, sort, per-endpoint detail and export.
 import { createStore, flatten, formatBytes, toMarkdown } from './recorder.mjs';
-import { describeFlow, detectPolling, endpointLabel, getSteps, isApiCall, nestCalls } from './flow.mjs';
+import { GRAPH, buildGraph, buildRouteTree, describeFlow, detectPolling, endpointLabel, getSteps, isApiCall, lineage, nestCalls } from './flow.mjs';
 
 const $ = (id) => document.getElementById(id);
 const MAX_ROWS = 1000;
 
 let store = createStore();
-const state = { q: '', method: '', host: '', type: '', sort: 'count', errorsOnly: false, withBody: false, selected: null, side: 'sample', sample: 0, fieldQ: '', mode: 'endpoints', step: undefined, stepSource: undefined, apiOnly: true };
+const state = { q: '', method: '', host: '', type: '', sort: 'count', errorsOnly: false, withBody: false, selected: null, side: 'sample', sample: 0, fieldQ: '', mode: 'endpoints', step: undefined, stepSource: undefined, apiOnly: true, collapsed: new Set(), graphFocus: null, zoom: undefined };
 
 function h(tag, props = {}, ...kids) {
   const el = document.createElement(tag);
@@ -108,7 +108,8 @@ const matchRow = ([side, path, value]) => h('div', { class: 'match mono' }, h('s
 
 /** Select an endpoint; with a search hit, open the matching field. */
 function pick(key, hit) {
-  setMode('endpoints');
+  if (state.mode === 'steps') setMode('endpoints');
+  state.graphFocus = key;
   state.selected = key;
   state.sample = 0;
   state.fieldQ = hit ? hit[1] : '';
@@ -240,17 +241,162 @@ function renderStepDetail() {
     h('div', { class: 'tools' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.apiOnly, onchange: (e) => { state.apiOnly = e.target.checked; render(); } }), ' API calls only (XHR and fetch)')),
     h('div', { class: 'panel' }, h('div', { class: 'tablewrap' }, h('table', {},
       h('thead', {}, h('tr', {}, ['Time', 'Call', 'Status', 'Duration', 'Size', 'Type'].map((t) => h('th', {}, t)))),
-      h('tbody', {}, tree.map(({ call: c, depth }) => {
+      h('tbody', {}, tree.flatMap(({ call: c, depth }) => {
         const ep = store.endpoints[c.key];
-        return h('tr', {},
+        const main = h('tr', {},
           h('td', { class: 'mono' }, `+${Math.max(0, ((c.s ?? c.at) - t0) / 1000).toFixed(1)} s`),
           h('td', {}, depth ? h('span', { class: 'nest', style: `margin-left:${(depth - 1) * 20}px` }) : null, h('span', { class: `mpill ${ep.method}` }, ep.method), ' ', h('span', { class: 'link mono', onclick: () => jumpTo(c.key) }, ep.path + (ep.rpc ? ` ${ep.rpc}` : '')), h('div', { class: 'muted' }, ep.host)),
           h('td', {}, h('span', { class: `pill ${c.status >= 400 ? 'err' : 'ok'}` }, String(c.status))),
           h('td', {}, `${c.timeMs} ms`),
           h('td', {}, c.size ? formatBytes(c.size) : '-'),
           h('td', {}, c.type || '-'));
+        return [main, ...subRows(c, depth)];
       })))))));
 }
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+function s(tag, attrs = {}, ...kids) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) el[k] = v;
+    else if (v !== undefined && v !== null && v !== false) el.setAttribute(k, v === true ? '' : v);
+  }
+  el.append(...kids.flat().filter((x) => x !== null && x !== undefined && x !== false));
+  return el;
+}
+const trunc = (text, n) => (text.length > n ? `${text.slice(0, n - 1)}...` : text);
+
+/** Select an endpoint without leaving the Map or Graph view. */
+function selectHere(key) {
+  state.selected = key;
+  state.graphFocus = key;
+  state.sample = 0;
+  state.fieldQ = '';
+  render();
+}
+
+/** The routing of the API as a tree: host, then the path segments, with the methods, counts and steps on each path. */
+function renderMap(eps) {
+  const list = $('list');
+  if (!eps.length) { renderList(eps); return; }
+  const trees = buildRouteTree(store, { keys: eps.map((e) => e.key), groups: getSteps(store, state.stepSource) });
+  const rows = [];
+  const pills = (endpoints) => endpoints.map((ep) => h('span', { class: 'mapep' },
+    h('span', {
+      class: `mpill ${ep.method}${ep.key === state.selected ? ' sel' : ''}`, title: `${ep.count} calls`,
+      onclick: (e) => { e.stopPropagation(); selectHere(ep.key); },
+    }, ep.method + (ep.rpc ? ` ${ep.rpc}` : '')),
+    h('span', { class: 'muted small' }, `${ep.count}`),
+    ep.errors ? h('span', { class: 'pill err' }, plural(ep.errors, 'error')) : null,
+    ep.steps.slice(0, 4).map((n) => h('span', { class: 'wp mini', title: `used in step ${n}` }, String(n)))));
+  const walk = (node, depth, prefix) => {
+    for (const child of node.children) {
+      const id = `${prefix}/${child.name}`;
+      const hasKids = child.children.length > 0;
+      const closed = state.collapsed.has(id);
+      const toggle = () => { if (!hasKids) return; if (closed) state.collapsed.delete(id); else state.collapsed.add(id); render(); };
+      rows.push(h('div', { class: 'mapnode', style: `padding-left:${10 + depth * 18}px` },
+        h('span', { class: `caret${hasKids ? (closed ? ' closed' : ' open') : ' none'}`, onclick: toggle }),
+        h('span', { class: 'mapname mono', onclick: toggle }, `/${child.name}`),
+        pills(child.endpoints),
+        closed ? h('span', { class: 'muted small' }, ` ${plural(child.count, 'call')} inside`) : null));
+      if (hasKids && !closed) walk(child, depth + 1, id);
+    }
+  };
+  for (const { host, root } of trees) {
+    rows.push(h('div', { class: 'maphost' }, h('b', {}, host), h('span', { class: 'muted' }, ` ${plural(root.count, 'call')}`)));
+    if (root.endpoints.length) rows.push(h('div', { class: 'mapnode', style: 'padding-left:10px' }, h('span', { class: 'caret none' }), h('span', { class: 'mapname mono' }, '/'), pills(root.endpoints)));
+    walk(root, 0, host);
+  }
+  list.replaceChildren(h('div', { class: 'maphint muted' }, 'The paths of the API as a tree. The numbers are the steps that used a path.'), ...rows);
+}
+
+/** A node graph of how the calls link together: from where the data starts (the login) to what it leads to. */
+function renderGraph(eps) {
+  const right = $('right');
+  const keys = eps.map((e) => e.key);
+  const graph = buildGraph(store, { keys, groups: getSteps(store, state.stepSource) });
+  if (!graph.nodes.length) {
+    right.replaceChildren(h('div', { class: 'empty' },
+      h('div', { class: 'big' }, 'No links between calls yet'),
+      'The graph shows which value from one call is used in another. Record some activity with example data switched on, then come back.'));
+    return;
+  }
+  const focus = graph.nodes.some((n) => n.key === state.graphFocus) ? state.graphFocus : null;
+  const lin = focus ? lineage(graph, focus) : null;
+  const available = Math.max(300, right.clientWidth - 56);
+  const zoom = state.zoom ?? Math.max(0.7, Math.min(1, available / graph.width)); // never so small that it cannot be read
+  const { nodeW, nodeH } = GRAPH;
+  const byKey = new Map(graph.nodes.map((n) => [n.key, n]));
+
+  const edgeEls = graph.edges.map((e) => {
+    const a = byKey.get(e.from);
+    const b = byKey.get(e.to);
+    const x1 = a.x + nodeW;
+    const y1 = a.y + nodeH / 2;
+    const x2 = b.x;
+    const y2 = b.y + nodeH / 2;
+    const dx = Math.max(60, Math.abs(x2 - x1) / 2);
+    const hi = lin?.edgeIds.has(e.id);
+    const cls = `gedge${e.back ? ' back' : ''}${hi ? ' hi' : ''}${lin && !hi ? ' dim' : ''}`;
+    const els = [s('path', { class: cls, d: `M${x1} ${y1} C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`, 'marker-end': hi ? 'url(#arrHi)' : 'url(#arr)' },
+      s('title', {}, `${e.labels.join('\n')}\ne.g. ${e.example}, ${e.count}x`))];
+    if (hi) els.push(s('text', { class: 'glabel', x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 6, 'text-anchor': 'middle' }, trunc(e.labels[0], 34) + (e.labels.length > 1 ? ` +${e.labels.length - 1}` : '')));
+    return els;
+  });
+
+  const nodeEls = graph.nodes.map((n) => {
+    const dim = lin && !lin.keys.has(n.key);
+    const label = trunc(n.path + (n.rpc ? ` ${n.rpc}` : ''), 21);
+    return s('g', { class: `gnode${n.key === focus ? ' sel' : ''}${dim ? ' dim' : ''}`, transform: `translate(${n.x} ${n.y})`, onclick: (e) => { e.stopPropagation(); state.graphFocus = n.key; state.selected = n.key; render(); } },
+      s('title', {}, `${n.method} ${n.host}${n.path}${n.rpc ? ` [${n.rpc}]` : ''}\n${n.count} calls`),
+      s('rect', { class: 'box', width: nodeW, height: nodeH, rx: 12 }),
+      s('g', { class: `gm ${n.method}` }, s('rect', { class: 'pill', x: 12, y: 11, width: 52, height: 22, rx: 6 }), s('text', { x: 38, y: 26, 'text-anchor': 'middle' }, n.method)),
+      s('text', { class: 'gpath', x: 74, y: 27 }, label),
+      s('text', { class: 'gmeta', x: 14, y: 49 }, `${trunc(n.host, 26)}  ·  ${plural(n.count, 'call')}`),
+      n.steps.slice(0, 3).map((num, i) => s('g', { class: 'gstep', transform: `translate(${nodeW - 16 - i * 22} 15)` }, s('circle', { r: 9 }), s('text', { y: 4, 'text-anchor': 'middle' }, String(num)))),
+      n.errors ? s('circle', { class: 'gerr', cx: nodeW - 12, cy: nodeH - 12, r: 5 }) : null);
+  });
+
+  const svg = s('svg', { class: 'graph', width: Math.round(graph.width * zoom), height: Math.round(graph.height * zoom), viewBox: `0 0 ${graph.width} ${graph.height}`, onclick: () => { state.graphFocus = null; render(); } },
+    s('defs', {},
+      s('marker', { id: 'arr', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, s('path', { class: 'arrow-shape', d: 'M0 0 L10 5 L0 10z' })),
+      s('marker', { id: 'arrHi', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, s('path', { class: 'arrow-shape hi', d: 'M0 0 L10 5 L0 10z' }))),
+    edgeEls.flat(), nodeEls);
+
+  const crumbs = lin ? h('div', { class: 'crumbs' }, h('span', { class: 'muted' }, 'Path to this call: '),
+    lin.path.flatMap((k, i) => [
+      i ? h('span', { class: 'muted' }, ' > ') : null,
+      h('span', { class: `crumb${k === focus ? ' cur' : ''}`, onclick: () => selectHere(k) }, shortEndpoint(store.endpoints[k])),
+    ]),
+    h('button', { onclick: () => { setMode('endpoints'); render(); } }, 'Open details')) : h('div', { class: 'crumbs muted' }, 'Click a call to see the path that leads to it and what it leads to.');
+  const unlinked = graph.unlinked.length ? h('div', { class: 'unlinked' },
+    h('div', { class: 'label' }, 'Not linked to other calls'),
+    h('div', { class: 'chips' }, graph.unlinked.map((k) => h('span', { class: 'pill mono link', onclick: () => jumpTo(k) }, shortEndpoint(store.endpoints[k]))))) : null;
+
+  right.replaceChildren(h('div', { class: 'detail' },
+    h('div', { class: 'title' }, h('h2', {}, 'Graph'),
+      h('span', { class: 'spacer' }),
+      h('button', { onclick: () => { state.zoom = (state.zoom ?? zoom) / 1.25; render(); } }, '-'),
+      h('button', { onclick: () => { state.zoom = (state.zoom ?? zoom) * 1.25; render(); } }, '+'),
+      h('button', { onclick: () => { state.zoom = undefined; render(); } }, 'Fit')),
+    h('div', { class: 'sub muted' }, 'Each block is a call. A line means a value returned by one call is used in the next: the data starts on the left (for example the login) and leads to what you see on the right.'),
+    crumbs,
+    h('div', { class: 'graphwrap' }, svg),
+    unlinked));
+}
+
+/** The operations inside one request (a batch or a GraphQL query with several fields), as chips. */
+function subsBlock(ep) {
+  const subs = Object.entries(ep.subs ?? {});
+  if (!subs.length) return null;
+  return h('div', { class: 'subs' }, h('span', { class: 'muted' }, 'Contains sub-calls: '),
+    subs.map(([name, n]) => h('span', { class: 'pill mono', title: 'An operation inside the request' }, `${name} x${n}`)));
+}
+
+/** In the steps view: the operations inside a request, shown under it. */
+const subRows = (c, depth) => (c.subs ?? []).map((name) => h('tr', { class: 'subrow' },
+  h('td', {}), h('td', { colspan: 5 }, h('span', { class: 'nest', style: `margin-left:${depth * 20 + 20}px` }), h('span', { class: 'muted' }, 'inside this request: '), h('span', { class: 'mono' }, name))));
 
 function fieldTable(node, term) {
   const t = term.trim().toLowerCase();
@@ -386,6 +532,7 @@ function renderDetail(eps) {
       Object.entries(ep.statuses).map(([s, n]) => h('span', { class: `pill ${Number(s) >= 400 ? 'err' : 'ok'}` }, `${s} x${n}`)),
       Object.entries(ep.resTypes ?? {}).map(([k, n]) => h('span', { class: 'pill mono', title: 'Response content type' }, `${k} x${n}`)),
       Object.keys(ep.query).map((k) => h('span', { class: 'pill mono', title: 'Query parameter' }, `?${k}`))),
+    subsBlock(ep),
     flowBlock(ep),
     ep.samples?.length ? null : h('div', { class: 'hint muted' }, 'No example calls stored. Turn on "Keep example data" in the extension popup and record again.'),
     side ? h('div', { class: 'panel' },
@@ -426,9 +573,10 @@ function render() {
   $('count').textContent = `${eps.length} of ${all.length}`;
   $('left').classList.toggle('steps-mode', state.mode === 'steps');
   if (state.mode === 'steps') { renderStepList(); renderStepDetail(); return; }
-  renderList(eps);
+  if (state.mode === 'map') renderMap(eps); else renderList(eps);
   const right = $('right');
   const typingInDetail = right.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+  if (state.mode === 'graph') { renderGraph(eps); return; }
   if (!typingInDetail) renderDetail(eps); // live updates must not steal focus from the field filter
 }
 

@@ -1,7 +1,7 @@
 // Pure logic of Surveyor: group requests per endpoint, infer field structure, keep example calls, render a report.
 // No browser APIs here so it can be unit tested with node:test.
 
-import { detectPolling, describeFlow, endpointLabel, flowSentence, getSteps, isApiCall } from './flow.mjs';
+import { buildRouteTree, detectPolling, describeFlow, endpointLabel, flowSentence, getSteps, isApiCall, routeTreeLines } from './flow.mjs';
 
 const MAX_DEPTH = 8;
 const MAX_ARRAY_ITEMS = 20;
@@ -120,6 +120,68 @@ export function parseBody(text, mime) {
   return undefined;
 }
 
+/**
+ * The root fields of a GraphQL query: `{ me { id } orders(first: 5) { id } ping }` -> ['me', 'orders', 'ping'].
+ * Aliases give the real field (`a: user(id: 1)` -> 'user'). A simple scanner, not a full parser.
+ */
+export function graphqlFields(query) {
+  if (typeof query !== 'string') return [];
+  const src = query.replace(/#[^\n]*/g, '').replace(/"(?:[^"\\]|\\.)*"/g, '""');
+  const names = [];
+  let depth = 0;
+  let paren = 0;
+  let expectName = false;
+  for (let i = src.indexOf('{'); i >= 0 && i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '(') paren++;
+    if (ch === ')') { paren--; continue; }
+    if (paren > 0) continue;
+    if (ch === '{') { depth++; expectName = depth === 1; continue; }
+    if (ch === '}') { depth--; if (depth === 0) break; expectName = depth === 1; continue; }
+    if (depth !== 1) continue;
+    if (ch === '@') { const d = /^@[A-Za-z_][A-Za-z0-9_]*/.exec(src.slice(i)); if (d) i += d[0].length - 1; continue; }
+    if (ch === '.') { const s = /^\.\.\.\s*(on\s+)?[A-Za-z_][A-Za-z0-9_]*/.exec(src.slice(i)); if (s) i += s[0].length - 1; continue; }
+    const word = /^[A-Za-z_][A-Za-z0-9_]*/.exec(src.slice(i));
+    if (!word) continue;
+    if (!expectName) { i += word[0].length - 1; continue; }
+    let name = word[0];
+    let end = i + name.length;
+    const alias = /^\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(src.slice(end));
+    if (alias) { name = alias[1]; end += alias[0].length; }
+    if (!name.startsWith('__')) names.push(name);
+    i = end - 1;
+    expectName = false;
+    if (/^\s*[\s,]/.test(src.slice(end, end + 1) || ' ') && !/^\s*[({@:]/.test(src.slice(end))) expectName = true; // next word is a new field
+  }
+  return names;
+}
+
+/**
+ * The operations inside one request: a JSON batch (an array of calls) or a GraphQL query with several root fields.
+ * [] when the request holds a single operation.
+ */
+export function subOperations(value) {
+  if (Array.isArray(value)) {
+    if (value.length < 2) return [];
+    return value.slice(0, 20).map((item, i) => {
+      const named = item && typeof item === 'object' ? rpcHint(item) || (typeof item.operationName === 'string' ? item.operationName : '') || graphqlFields(item.query)[0] : '';
+      return named || `#${i + 1}`;
+    });
+  }
+  if (value && typeof value === 'object' && typeof value.query === 'string') {
+    const fields = graphqlFields(value.query);
+    return fields.length >= 2 ? fields.slice(0, 20) : [];
+  }
+  return [];
+}
+
+/** The routing of the API as a tree in Markdown, with the steps that used each path. */
+function routeMarkdown(store, only) {
+  const trees = buildRouteTree(store, { keys: only, groups: getSteps(store) });
+  if (!trees.length) return [];
+  return ['# API map', '', 'The paths of the API as a tree: the methods seen on each path, how often, and the steps that used it.', '', ...routeTreeLines(trees), ''];
+}
+
 const bump = (counts, key) => { counts[key] = (counts[key] ?? 0) + 1; };
 
 /**
@@ -135,6 +197,7 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
   const reqValue = req && req.kind !== 'text' ? req.value : undefined;
   const resValue = res && res.kind !== 'text' ? res.value : undefined;
   const hint = rpcHint(reqValue);
+  const subs = subOperations(reqValue); // operations inside this one request (a batch, a GraphQL query with several fields)
   const path = normalizePath(url.pathname);
   const key = `${entry.method} ${url.host}${path}${hint ? ` [${hint}]` : ''}`;
 
@@ -158,6 +221,10 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
   for (const name of url.searchParams.keys()) ep.query[name] = (ep.query[name] ?? 0) + 1;
   if (entry.reqText) bump(ep.reqTypes, normalizeMime(entry.reqMime));
   if (entry.resMime) bump(ep.resTypes, normalizeMime(entry.resMime));
+  if (subs.length) {
+    ep.subs ??= {};
+    for (const name of subs) if (name in ep.subs || Object.keys(ep.subs).length < 40) bump(ep.subs, name);
+  }
   if (reqValue !== undefined) mergeSchema((ep.req ??= newNode()), reqValue, { keepExamples });
   if (resValue !== undefined) mergeSchema((ep.res ??= newNode()), resValue, { keepExamples });
 
@@ -165,6 +232,7 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
   (store.calls ??= []).push({
     n: (store.callSeq = (store.callSeq ?? 0) + 1), at: Date.now(), s: Date.now() - Math.round(entry.timeMs ?? 0), step: store.steps?.length ? store.steps.length - 1 : null,
     key, status: entry.status, timeMs: Math.round(entry.timeMs ?? 0), size: entry.size, type: entry.type,
+    subs: subs.length ? subs.slice(0, 10) : undefined,
   });
   if (store.calls.length > MAX_CALLS) store.calls.splice(0, store.calls.length - MAX_CALLS);
 
@@ -359,7 +427,7 @@ const counts = (obj) => Object.entries(obj ?? {}).map(([k, n]) => `${k} x${n}`).
 /** Markdown report. `only` (optional): array of endpoint keys to include. */
 export function toMarkdown(store, only) {
   const eps = Object.values(store.endpoints).filter((ep) => !only || only.includes(ep.key)).sort((a, b) => b.count - a.count);
-  const lines = [`# Recorded endpoints (${eps.length})`, '', `Recording started ${store.started}.`, '', ...stepsMarkdown(store, only), ...flowMarkdown(store, only)];
+  const lines = [`# Recorded endpoints (${eps.length})`, '', `Recording started ${store.started}.`, '', ...routeMarkdown(store, only), ...stepsMarkdown(store, only), ...flowMarkdown(store, only)];
   for (const ep of eps) {
     lines.push(`## ${ep.method} ${ep.host}${ep.path}${ep.rpc ? ` [${ep.rpc}]` : ''}`, '');
     lines.push(`- Calls: ${ep.count}, average ${Math.round(ep.timeSum / ep.count)} ms, max ${Math.round(ep.timeMax)} ms`);
@@ -368,6 +436,7 @@ export function toMarkdown(store, only) {
     if (ep.type) lines.push(`- Request type: ${ep.type}`);
     if (Object.keys(ep.reqTypes ?? {}).length) lines.push(`- Request content types: ${counts(ep.reqTypes)}`);
     if (Object.keys(ep.resTypes ?? {}).length) lines.push(`- Response content types: ${counts(ep.resTypes)}`);
+    if (Object.keys(ep.subs ?? {}).length) lines.push(`- Contains sub-calls: ${counts(ep.subs)}`);
     if (Object.keys(ep.query).length) lines.push(`- Query parameters: ${Object.entries(ep.query).map(([k, n]) => `${k} (${n})`).join(', ')}`);
     lines.push('');
     for (const s of (ep.samples ?? []).slice(-2).reverse()) {
