@@ -28,15 +28,16 @@ const getTabs = () => (tabsPromise ??= chrome.storage.session.get('tabs').then((
 const persistTabs = async () => chrome.storage.session.set({ tabs: [...(await getTabs())] });
 
 // Settings are cached because they are needed for every network event.
-let settings = { keepExamples: true };
+let settings = { keepExamples: true, analyseHeaders: true };
 const settingsReady = chrome.storage.local.get('settings').then((saved) => { settings = { ...settings, ...saved.settings }; });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.settings) settings = { keepExamples: true, ...changes.settings.newValue };
+  if (area === 'local' && changes.settings) settings = { keepExamples: true, analyseHeaders: true, ...changes.settings.newValue };
 });
 
 const capture = createCapture({
   getBody: (tabId, requestId) => chrome.debugger.sendCommand({ tabId }, 'Network.getResponseBody', { requestId }),
   wantAll: () => true, // every request type, from every host the page talks to
+  analyseHeaders: () => settings.analyseHeaders, // names, harmless values and token fingerprints, never secrets (headers.mjs)
   onEntry: async (entry) => {
     if (!/^https?:/.test(entry.url)) return;
     try {
@@ -114,6 +115,7 @@ async function handle(msg) {
       return {
         recording: (await getTabs()).has(msg.tabId),
         keepExamples: settings.keepExamples,
+        analyseHeaders: settings.analyseHeaders,
         endpoints: eps.length,
         calls: eps.reduce((n, e) => n + e.count, 0),
         stepCount: store.steps?.length ?? 0,
@@ -144,7 +146,7 @@ async function handle(msg) {
       await saveNow();
       return null;
     case 'setSettings':
-      await chrome.storage.local.set({ settings: { keepExamples: Boolean(msg.keepExamples) } });
+      await chrome.storage.local.set({ settings: { keepExamples: Boolean(msg.keepExamples), analyseHeaders: msg.analyseHeaders !== false } });
       return null;
     default:
       return null;

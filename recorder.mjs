@@ -1,6 +1,7 @@
 // Pure logic of Surveyor: group requests per endpoint, infer field structure, keep example calls, render a report.
 // No browser APIs here so it can be unit tested with node:test.
 
+import { TOKENISH, devNotes } from './headers.mjs';
 import { buildRouteTree, detectPolling, describeFlow, endpointLabel, flowSentence, getSteps, isApiCall, routeTreeLines } from './flow.mjs';
 
 const MAX_DEPTH = 8;
@@ -175,6 +176,36 @@ export function subOperations(value) {
   return [];
 }
 
+/** How requests prove who they are, per host: scheme, cookie names and header names. Values are never recorded. */
+function authMarkdown(store, only) {
+  const hosts = new Map();
+  for (const ep of Object.values(store.endpoints)) {
+    if (only && !only.includes(ep.key)) continue;
+    const h = hosts.get(ep.host) ?? { auth: {}, cookies: new Set(), setCookies: new Set(), headers: new Set(), stack: new Set() };
+    hosts.set(ep.host, h);
+    for (const [k, n] of Object.entries(ep.auth ?? {})) h.auth[k] = (h.auth[k] ?? 0) + n;
+    for (const c of Object.keys(ep.cookies ?? {})) h.cookies.add(c);
+    for (const c of Object.keys(ep.setCookies ?? {})) h.setCookies.add(c);
+    for (const n of Object.keys(ep.reqHeaders ?? {})) if (n !== 'authorization' && TOKENISH.test(n) && !/^(content-|accept|cache-)/.test(n)) h.headers.add(n);
+    for (const k of ['response server', 'response x-powered-by']) for (const v of Object.keys(ep.safeHeaders?.[k] ?? {})) h.stack.add(v);
+  }
+  const rows = [...hosts].filter(([, h]) => Object.keys(h.auth).length || h.cookies.size || h.setCookies.size || h.headers.size);
+  if (!rows.length) return [];
+  const lines = ['# Authentication', '', 'How requests prove who they are: the scheme, cookies and headers (names only, values are never recorded).', ''];
+  for (const [host, h] of rows) {
+    const parts = [
+      Object.keys(h.auth).length ? Object.entries(h.auth).map(([k, n]) => `${k} (${n} calls)`).join(', ') : '',
+      h.cookies.size ? `cookies sent: ${[...h.cookies].join(', ')}` : '',
+      h.setCookies.size ? `cookies set: ${[...h.setCookies].join(', ')}` : '',
+      h.headers.size ? `headers: ${[...h.headers].join(', ')}` : '',
+      h.stack.size ? `stack: ${[...h.stack].join(', ')}` : '',
+    ].filter(Boolean);
+    lines.push(`- ${host}: ${parts.join('; ')}`);
+  }
+  lines.push('');
+  return lines;
+}
+
 /** The routing of the API as a tree in Markdown, with the steps that used each path. */
 function routeMarkdown(store, only) {
   const trees = buildRouteTree(store, { keys: only, groups: getSteps(store) });
@@ -183,6 +214,14 @@ function routeMarkdown(store, only) {
 }
 
 const bump = (counts, key) => { counts[key] = (counts[key] ?? 0) + 1; };
+/** Count a key, but keep at most `cap` different keys (a header set can be large). */
+const bumpCapped = (counts, key, cap = 60) => { if (key in counts || Object.keys(counts).length < cap) bump(counts, key); };
+/** Count a value under a header name: at most 6 different values per header, 40 header names. */
+const bumpValue = (map, name, value) => {
+  if (!(name in map) && Object.keys(map).length >= 40) return;
+  const values = (map[name] ??= {});
+  if (value in values || Object.keys(values).length < 6) bump(values, value);
+};
 
 /**
  * Add one finished request.
@@ -225,6 +264,19 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
     ep.subs ??= {};
     for (const name of subs) if (name in ep.subs || Object.keys(ep.subs).length < 40) bump(ep.subs, name);
   }
+  const hs = entry.headers; // a summary from headers.mjs: names, harmless values, fingerprints of tokens, never the values
+  if (hs) {
+    for (const k of ['reqHeaders', 'resHeaders', 'safeHeaders', 'auth', 'cookies', 'setCookies', 'rels']) ep[k] ??= {};
+    for (const n of hs.req.names) bumpCapped(ep.reqHeaders, n);
+    for (const n of hs.res.names) bumpCapped(ep.resHeaders, n);
+    for (const [n, v] of Object.entries(hs.req.safe)) bumpValue(ep.safeHeaders, `request ${n}`, v);
+    for (const [n, v] of Object.entries(hs.res.safe)) bumpValue(ep.safeHeaders, `response ${n}`, v);
+    if (hs.req.auth) bump(ep.auth, hs.req.auth);
+    if (hs.res.www) bump(ep.auth, `challenge: ${hs.res.www}`);
+    for (const c of hs.req.cookies) bumpCapped(ep.cookies, c);
+    for (const c of hs.res.setCookies) bumpCapped(ep.setCookies, c);
+    for (const rel of hs.res.rels) bumpCapped(ep.rels, rel);
+  }
   if (reqValue !== undefined) mergeSchema((ep.req ??= newNode()), reqValue, { keepExamples });
   if (resValue !== undefined) mergeSchema((ep.res ??= newNode()), resValue, { keepExamples });
 
@@ -258,8 +310,10 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
     addFound(ep, 'req', reqLeaves);
     const queryLeaves = [...url.searchParams].map(([k, v]) => [`?${k}`, v]);
     addFound(ep, 'url', queryLeaves);
-    linkChains(store, key, url, queryLeaves, reqLeaves); // before indexing this response, so a call never links to itself
-    indexValues(store, key, resLeaves);
+    const headersOut = (hs?.tokensOut ?? []).map((t) => [t.where, `h:${t.hash}`]);
+    const headersIn = (hs?.tokensIn ?? []).map((t) => [t.where, `h:${t.hash}`]);
+    linkChains(store, key, url, queryLeaves, reqLeaves, headersIn); // before indexing this response, so a call never links to itself
+    indexValues(store, key, [...resLeaves, ...headersOut]);
   }
   return ep;
 }
@@ -317,7 +371,7 @@ function indexValues(store, key, leaves) {
 }
 
 /** If this request carries a value an earlier response produced, record that link (producer field -> where it is used here). */
-function linkChains(store, key, url, queryLeaves, bodyLeaves) {
+function linkChains(store, key, url, queryLeaves, bodyLeaves, extraUsed = []) {
   const index = store.valueIndex ?? {};
   const used = [];
   for (const seg of url.pathname.split('/')) {
@@ -327,12 +381,13 @@ function linkChains(store, key, url, queryLeaves, bodyLeaves) {
   }
   for (const [name, value] of queryLeaves) used.push([`query ${name.replace(/^\?/, '')}`, value]);
   for (const [path, value] of bodyLeaves) used.push([`body ${path}`, value]);
+  for (const [where, value] of extraUsed) used.push([where, value]);
   for (const [where, value] of used) {
     const v = consumedValue(value);
     const from = v === null ? undefined : index[`v:${v}`];
     if (!from || from.key === key) continue;
     const id = `${from.key} ${from.path} -> ${key} ${where}`;
-    const chain = ((store.chains ??= {})[id] ??= { from, to: { key, where }, count: 0, example: v.slice(0, 40), pairs: [] });
+    const chain = ((store.chains ??= {})[id] ??= { from, to: { key, where }, count: 0, example: v.startsWith('h:') ? 'a token (the value is not stored)' : v.slice(0, 40), pairs: [] });
     chain.count++;
     if (from.n !== undefined && (chain.pairs ??= []).length < 30) chain.pairs.push([from.n, store.callSeq]);
   }
@@ -427,7 +482,7 @@ const counts = (obj) => Object.entries(obj ?? {}).map(([k, n]) => `${k} x${n}`).
 /** Markdown report. `only` (optional): array of endpoint keys to include. */
 export function toMarkdown(store, only) {
   const eps = Object.values(store.endpoints).filter((ep) => !only || only.includes(ep.key)).sort((a, b) => b.count - a.count);
-  const lines = [`# Recorded endpoints (${eps.length})`, '', `Recording started ${store.started}.`, '', ...routeMarkdown(store, only), ...stepsMarkdown(store, only), ...flowMarkdown(store, only)];
+  const lines = [`# Recorded endpoints (${eps.length})`, '', `Recording started ${store.started}.`, '', ...routeMarkdown(store, only), ...authMarkdown(store, only), ...stepsMarkdown(store, only), ...flowMarkdown(store, only)];
   for (const ep of eps) {
     lines.push(`## ${ep.method} ${ep.host}${ep.path}${ep.rpc ? ` [${ep.rpc}]` : ''}`, '');
     lines.push(`- Calls: ${ep.count}, average ${Math.round(ep.timeSum / ep.count)} ms, max ${Math.round(ep.timeMax)} ms`);
@@ -438,6 +493,7 @@ export function toMarkdown(store, only) {
     if (Object.keys(ep.resTypes ?? {}).length) lines.push(`- Response content types: ${counts(ep.resTypes)}`);
     if (Object.keys(ep.subs ?? {}).length) lines.push(`- Contains sub-calls: ${counts(ep.subs)}`);
     if (Object.keys(ep.query).length) lines.push(`- Query parameters: ${Object.entries(ep.query).map(([k, n]) => `${k} (${n})`).join(', ')}`);
+    for (const [label, text] of devNotes(ep)) lines.push(`- ${label}: ${text}`);
     lines.push('');
     for (const s of (ep.samples ?? []).slice(-2).reverse()) {
       lines.push(`Example call: \`${ep.method} ${s.url}\` -> ${s.status} (${s.timeMs} ms${s.size ? `, ${formatBytes(s.size)}` : ''})${s.cut ? ', shortened' : ''}`, '');

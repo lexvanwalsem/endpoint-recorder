@@ -23,7 +23,7 @@ Thanks for wanting to help. Pull requests are welcome.
 - English for code, comments and interface text.
 - Small functions, clear names, comments that explain why.
 - Never use `innerHTML` with recorded data; build DOM nodes with text.
-- Keep privacy in mind: the extension must never read request headers other than `Content-Type`, and must never send
+- Keep privacy in mind: the extension must never store the value of a cookie, token or other secret (only header names, the harmless values listed in `headers.mjs` and fingerprints), and must never send
   data anywhere.
 
 ## Reporting a bug

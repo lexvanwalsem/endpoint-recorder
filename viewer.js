@@ -1,5 +1,6 @@
 // Full page view of the recording: search, filter, sort, per-endpoint detail and export.
 import { createStore, flatten, formatBytes, toMarkdown } from './recorder.mjs';
+import { devNotes } from './headers.mjs';
 import { GRAPH, buildGraph, buildRouteTree, describeFlow, detectPolling, endpointLabel, getSteps, isApiCall, lineage, nestCalls } from './flow.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -386,6 +387,23 @@ function renderGraph(eps) {
     unlinked));
 }
 
+/** What a developer wants to know about an endpoint, read from its headers (authentication, paging, caching, CORS, ...). */
+function headersBlock(ep) {
+  const notes = devNotes(ep);
+  const req = Object.keys(ep.reqHeaders ?? {});
+  const res = Object.keys(ep.resHeaders ?? {});
+  if (!notes.length && !req.length && !res.length) return null;
+  const chips = (list) => h('div', { class: 'chips' },
+    list.slice(0, 14).map((n) => h('span', { class: 'pill mono' }, n)),
+    list.length > 14 ? h('span', { class: 'muted' }, `+${list.length - 14} more`) : null);
+  const row = (label, content) => h('div', { class: 'hdrrow' }, h('span', { class: 'hdrlabel' }, label), content);
+  return h('div', { class: 'hdrs' },
+    h('div', { class: 'label' }, 'For developers, from the headers'),
+    notes.map(([label, text]) => row(label, h('span', { class: 'mono' }, text))),
+    req.length ? row('Request headers', chips(req)) : null,
+    res.length ? row('Response headers', chips(res)) : null);
+}
+
 /** The operations inside one request (a batch or a GraphQL query with several fields), as chips. */
 function subsBlock(ep) {
   const subs = Object.entries(ep.subs ?? {});
@@ -532,6 +550,7 @@ function renderDetail(eps) {
       Object.entries(ep.statuses).map(([s, n]) => h('span', { class: `pill ${Number(s) >= 400 ? 'err' : 'ok'}` }, `${s} x${n}`)),
       Object.entries(ep.resTypes ?? {}).map(([k, n]) => h('span', { class: 'pill mono', title: 'Response content type' }, `${k} x${n}`)),
       Object.keys(ep.query).map((k) => h('span', { class: 'pill mono', title: 'Query parameter' }, `?${k}`))),
+    headersBlock(ep),
     subsBlock(ep),
     flowBlock(ep),
     ep.samples?.length ? null : h('div', { class: 'hint muted' }, 'No example calls stored. Turn on "Keep example data" in the extension popup and record again.'),

@@ -244,3 +244,10 @@ header::before {
 .gstep circle { fill: var(--amber); }
 .gstep text { fill: #2b1d00; font-size: 11px; font-weight: 800; }
 .gerr { fill: var(--danger); }
+
+/* Header analysis for developers */
+.hdrs { margin: 12px 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.hdrs .label { color: var(--muted); font-size: 13.5px; margin-bottom: 6px; }
+.hdrrow { display: flex; gap: 14px; padding: 3px 0; align-items: baseline; }
+.hdrlabel { min-width: 130px; flex: none; color: var(--muted); font-size: 13.5px; }
+.hdrrow .mono { overflow-wrap: anywhere; font-size: 13.5px; }

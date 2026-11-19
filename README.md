@@ -42,6 +42,7 @@ something you can read, search and share:
 - **How it fits together**: for each step what it needs from earlier steps and what it passes on, in plain sentences.
 - **A graph of the whole system**: every call as a block, lines for the values that travel between them, from the login to the data, with the side branches.
 - **The routing of the API** as a tree of paths, with the methods, counts and the steps that used each path.
+- **What developers need from the headers**: how requests authenticate, paging, rate limits, caching, CORS, versions, tracing ids and the stack, per endpoint and in the report.
 
 It works on any site, on a tab that is already open, without a proxy, certificates, command line or account.
 
@@ -61,7 +62,7 @@ Surveyor is built around that second half:
 - **Data flow per step** shows where a value comes from and where it is used again, explained in plain sentences.
 - **Search by value** finds the endpoint and field behind anything you can see on screen.
 - **Real examples of every kind of body**, not only JSON: HTML, XML, form data and plain text too.
-- **Privacy by design**: request headers are never stored and everything stays on your computer.
+- **Privacy by design**: cookie and token values are never stored, and everything stays on your computer.
 
 Use it next to a spec generator or instead of one. An OpenAPI export is on the list below.
 
@@ -167,6 +168,19 @@ large responses are listed with their type and size.
 Example calls show the full URL including query values, what was sent and what came back, as colour-coded formatted
 JSON with a copy button.
 
+### What a developer needs from the headers
+
+Per endpoint a block "For developers" collects what the headers tell you: **how requests authenticate** (Bearer, JWT, Basic,
+cookie names, token header names), **paging** (`page` and `limit` parameters, `Link` relations, total counts),
+**rate limits**, **caching** (cache-control, ETag, conditional requests), **CORS**, **versions and deprecation**,
+**tracing ids**, **idempotency keys**, **compression** and the **server stack**. Tokens and cookies returned by one call and sent
+back in a later one become links in the data flow and the graph. The report has an **Authentication** overview per host.
+Cookie and token values are never stored, only a short fingerprint to recognise them.
+
+<p align="center">
+  <img src="docs/developers.png" alt="An endpoint with the developer block: authentication, paging, rate limit, caching, CORS, tracing ids and the stack" width="900">
+</p>
+
 ### Find the problems
 
 Errors are flagged with a count. Average and slowest time and the transfer size are shown per endpoint. You can filter on
@@ -231,13 +245,16 @@ Response fields
 | $.result[].author_id | array | 100% | |
 ````
 
-The export starts with a **Steps** section (with, per step, what it needs and what it passes on), a **Background calls** section and a **Data flow** section.
+The export starts with an **API map**, an **Authentication** overview, a **Steps** section (with, per step, what it needs and what it passes on), a **Background calls** section and a **Data flow** section. Per endpoint it lists the notes for developers.
 
 ## Built to be trusted
 
 - **Everything stays on your computer.** No server, no account, no analytics, no network requests of its own.
-- **Request headers are not stored.** The only header it looks at is `Content-Type`, to know how to read a body.
-  Cookies, authorization headers and tokens never enter the recording.
+- **Secrets never enter the recording.** Of the headers, Surveyor keeps the names, a short list of harmless values
+  (content type, caching, paging, rate limits, CORS, versions, the server) and, for tokens and cookies, only a short
+  fingerprint (12 characters of a SHA-256) so that a token returned by one call can be recognised in the next. The values of
+  `Authorization`, `Cookie`, `Set-Cookie` and token headers are never stored, shown or exported. Untick **Analyse headers**
+  in the popup to read no headers at all.
 - **You decide what is kept.** With **Keep example data** off, only field names and types are kept.
 - **No dependencies and small enough to read.** About a thousand lines of plain JavaScript, no build step, no packages
   to trust. You can review all of it in an afternoon.
@@ -282,7 +299,8 @@ hint, not proof: check them. The newest call that returned a value is taken as i
 ## Limits
 
 - WebSocket and Server-Sent Events traffic is not captured.
-- Request headers are not read, so tokens sent in headers are not followed in the data flow.
+- Tokens in headers are followed by their fingerprint only, and only when the same value is sent back unchanged.
+- Header values that are not on the list of harmless ones are not kept, only the header names.
 - Bodies are read up to 50 MB; larger responses are listed with their size but without content.
 - Binary bodies (images, PDF, archives) are not shown, only their type and size.
 - Multipart uploads are listed, but their parts are not broken down.

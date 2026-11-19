@@ -26,6 +26,7 @@ async function render() {
   $('toggle').textContent = s.recording ? 'Stop recording' : 'Record this tab';
   $('toggle').classList.toggle('primary', !s.recording);
   if (document.activeElement !== $('examples')) $('examples').checked = s.keepExamples;
+  if (document.activeElement !== $('headers')) $('headers').checked = s.analyseHeaders;
 
   const line = document.createDocumentFragment();
   if (s.recording) line.append(Object.assign(document.createElement('span'), { className: 'rec-dot' }));
@@ -61,7 +62,9 @@ $('mark').onclick = markCurrentStep;
 $('stepLabel').onkeydown = (e) => { if (e.key === 'Enter') markCurrentStep(); };
 
 $('reload').onclick = () => chrome.tabs.reload(tab.id);
-$('examples').onchange = () => send({ type: 'setSettings', keepExamples: $('examples').checked });
+const saveSettings = () => send({ type: 'setSettings', keepExamples: $('examples').checked, analyseHeaders: $('headers').checked });
+$('examples').onchange = saveSettings;
+$('headers').onchange = saveSettings;
 
 $('open').onclick = async () => {
   const url = chrome.runtime.getURL('viewer.html');
