@@ -158,7 +158,6 @@ header { background: var(--surface) var(--topo) 0 0 / 900px 360px repeat; }
 #right { background: var(--bg); }
 header {
   background: var(--surface); position: relative; overflow: hidden;
-  box-shadow: inset 0 -3px 0 var(--amber);
 }
 header > * { position: relative; }
 header::before {
@@ -169,4 +168,3 @@ header::before {
   pointer-events: none;
 }
 .empty { background: var(--topo-soft) 50% 100% / 900px 360px repeat-x; padding-bottom: 96px; }
-.seg button.active { box-shadow: var(--shadow), inset 0 -2px 0 var(--amber); }
