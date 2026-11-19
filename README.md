@@ -101,17 +101,20 @@ the field and the value, for example `RECEIVED $.items[].customer.name = Fleur M
 
 ### Follow what an action triggers
 
-Surveyor groups the calls into steps by itself, without you doing anything. A pause in the API traffic or a page
-navigation (also route changes in single page apps) starts a new step. Each step gets a name from what its calls do, for
-example "Open ticket", "Add message to ticket + Close ticket" or "Open /tickets". Calls that repeat at a regular interval
-(polling) are left out and listed separately under **Background calls**.
+**A step is something you did in the interface, plus the API calls that followed it.** It is not an internal step of the
+API. The browser does not tell Surveyor when you click, so it works out your actions itself, without you doing
+anything: a pause in the API traffic or a page navigation (also route changes in single page apps) starts a new step.
+Each step gets a name from what its calls do, for example "Open ticket", "Add message to ticket + Close ticket" or
+"Open /tickets". Calls that repeat at a regular interval (polling) are left out and listed separately under
+**Background calls**.
 
-Open a step to see its calls in order, with time since the step, status, duration and size. Click a call to jump to its
-endpoint. Want your own names? Type what you are about to do and press **Mark step** in the popup. Your steps are then
+Open a step to see its calls in order, with time since the step, status, duration and size. Inside a step the calls are
+nested: a call shown indented used a value returned by the call above it, so you can see which call led to which. Click
+a call to jump to its endpoint. Want your own names? Type what you are about to do and press **Mark step** in the popup. Your steps are then
 shown instead, and you can switch between **Marked by you** and **Detected**.
 
 <p align="center">
-  <img src="docs/steps.png" alt="Steps view: the calls made after each step you marked" width="900">
+  <img src="docs/steps.png" alt="A step with its flow and its calls, nested by which call used a value from which" width="900">
 </p>
 
 ### See how calls depend on each other

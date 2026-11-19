@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { addEntry, createStore, markStep, toMarkdown } from '../recorder.mjs';
-import { addNav, describeCall, describeFlow, detectPolling, detectSteps, getSteps } from '../flow.mjs';
+import { addNav, describeCall, describeFlow, detectPolling, detectSteps, getSteps, nestCalls } from '../flow.mjs';
 
 const BASE = 1_000_000;
 
@@ -186,4 +186,16 @@ test('a step that changes several things names the first two, a reading step nam
     tick(6100); call(store, 'GET', 'https://x.example/api/customers', {});
     assert.deepEqual(detectSteps(store).map((s) => s.label), ['Add message to ticket + Close ticket (+1 more)', 'Open ticket (+1 more)']);
   });
+});
+
+test('nested calls: a call that used a value from an earlier call in the same step is shown under it', () => {
+  const store = scenario();
+  const openTicket = getSteps(store)[2]; // GET /tickets/{id}, then GET /tickets/{id}/messages that uses the id it returned
+  const tree = nestCalls(store, openTicket.calls);
+  assert.deepEqual(tree.map((t) => [store.endpoints[t.call.key].path, t.depth]), [['/api/tickets/{id}', 0], ['/api/tickets/{id}/messages', 1]]);
+  // a step without links inside has a flat list
+  const login = nestCalls(store, getSteps(store)[0].calls);
+  assert.deepEqual(login.map((t) => t.depth), [0]);
+  // values from an earlier step do not nest: the close call is a root of its own step
+  assert.deepEqual(nestCalls(store, getSteps(store)[3].calls).map((t) => t.depth), [0]);
 });

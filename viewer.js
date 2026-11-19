@@ -1,6 +1,6 @@
 // Full page view of the recording: search, filter, sort, per-endpoint detail and export.
 import { createStore, flatten, formatBytes, toMarkdown } from './recorder.mjs';
-import { describeFlow, detectPolling, endpointLabel, getSteps, isApiCall } from './flow.mjs';
+import { describeFlow, detectPolling, endpointLabel, getSteps, isApiCall, nestCalls } from './flow.mjs';
 
 const $ = (id) => document.getElementById(id);
 const MAX_ROWS = 1000;
@@ -179,11 +179,12 @@ function renderStepList() {
   const item = (id, extraClass, top, meta) => h('div', { class: `item${id === state.step ? ' selected' : ''}${extraClass}`, onclick: () => { state.step = id; render(); } },
     h('div', { class: 'top' }, ...top), h('div', { class: 'meta' }, meta));
 
+  const note = h('div', { class: 'stepnote muted' }, 'A step is something you did (a click, a page change) and the API calls that followed it.');
   const overview = groups.length ? item('overview', '', [h('span', { class: 'path' }, 'Flow overview')], `${plural(groups.length, 'step')} and how they connect`) : null;
   const steps = groups.map((g, i) => item(g.index, i < groups.length - 1 ? ' route' : '', [stepMarker(g), h('span', { class: 'path' }, g.label)],
     `${plural(g.calls.filter(isApiCall).length, 'API call')}${g.at ? ` · ${new Date(g.at).toLocaleTimeString()}` : ''}${g.auto ? ' · detected' : ''}`));
   const background = polling.length ? item('background', '', [h('span', { class: 'path' }, 'Background calls')], `${plural(polling.length, 'endpoint')} repeated at a regular interval`) : null;
-  list.replaceChildren(...[toggle, overview, ...steps, background].filter(Boolean));
+  list.replaceChildren(...[toggle, note, overview, ...steps, background].filter(Boolean));
 }
 
 function renderOverview(right, groups) {
@@ -229,18 +230,21 @@ function renderStepDetail() {
   const calls = g.calls.filter((c) => (!state.apiOnly || isApiCall(c)) && store.endpoints[c.key]);
   const t0 = g.at ? Date.parse(g.at) : (g.calls[0]?.at ?? 0);
   const rows = flowRows(flow);
+  const tree = nestCalls(store, calls);
+  const nested = tree.some((t) => t.depth > 0);
   right.replaceChildren(h('div', { class: 'detail' },
     h('div', { class: 'title' }, stepMarker(g), h('h2', {}, g.label)),
     h('div', { class: 'sub muted' }, `${g.at ? `${time(g.at)} · ` : ''}${plural(calls.length, 'call')} shown${g.auto ? ' · detected automatically' : ''}`),
+    h('div', { class: 'explain muted' }, `This is what the page did after something you did (a click or a page change).${nested ? ' A call shown indented used a value returned by the call above it.' : ''}`),
     rows.length ? h('div', { class: 'flow' }, h('div', { class: 'label' }, 'Flow'), rows) : null,
     h('div', { class: 'tools' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.apiOnly, onchange: (e) => { state.apiOnly = e.target.checked; render(); } }), ' API calls only (XHR and fetch)')),
     h('div', { class: 'panel' }, h('div', { class: 'tablewrap' }, h('table', {},
       h('thead', {}, h('tr', {}, ['Time', 'Call', 'Status', 'Duration', 'Size', 'Type'].map((t) => h('th', {}, t)))),
-      h('tbody', {}, calls.map((c) => {
+      h('tbody', {}, tree.map(({ call: c, depth }) => {
         const ep = store.endpoints[c.key];
         return h('tr', {},
           h('td', { class: 'mono' }, `+${Math.max(0, ((c.s ?? c.at) - t0) / 1000).toFixed(1)} s`),
-          h('td', {}, h('span', { class: `mpill ${ep.method}` }, ep.method), ' ', h('span', { class: 'link mono', onclick: () => jumpTo(c.key) }, ep.path + (ep.rpc ? ` ${ep.rpc}` : '')), h('div', { class: 'muted' }, ep.host)),
+          h('td', {}, depth ? h('span', { class: 'nest', style: `margin-left:${(depth - 1) * 20}px` }) : null, h('span', { class: `mpill ${ep.method}` }, ep.method), ' ', h('span', { class: 'link mono', onclick: () => jumpTo(c.key) }, ep.path + (ep.rpc ? ` ${ep.rpc}` : '')), h('div', { class: 'muted' }, ep.host)),
           h('td', {}, h('span', { class: `pill ${c.status >= 400 ? 'err' : 'ok'}` }, String(c.status))),
           h('td', {}, `${c.timeMs} ms`),
           h('td', {}, c.size ? formatBytes(c.size) : '-'),

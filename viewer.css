@@ -186,3 +186,8 @@ header::before {
   -webkit-mask-image: linear-gradient(to bottom, #000, transparent); mask-image: linear-gradient(to bottom, #000, transparent);
   pointer-events: none;
 }
+
+/* Nested calls and the short explanation of a step */
+.nest { display: inline-block; width: 14px; height: 13px; margin-right: 8px; vertical-align: top; border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-radius: 0 0 0 6px; }
+.stepnote { padding: 2px 8px 10px; font-size: 13.5px; }
+.explain { margin: 0 0 10px; font-size: 13.5px; }

@@ -153,6 +153,37 @@ export function flowEdges(store, groups) {
   return [...edges.values()];
 }
 
+/**
+ * The calls of one step as a tree: a call that used a value returned by an earlier call of the same step is nested under
+ * it (the closest earlier producer). Returns [{ call, depth }] in reading order.
+ */
+export function nestCalls(store, calls) {
+  const inStep = new Set(calls.map((c) => c.n));
+  const parentOf = new Map();
+  for (const chain of Object.values(store.chains ?? {})) {
+    for (const [fromN, toN] of chain.pairs ?? []) {
+      if (!inStep.has(fromN) || !inStep.has(toN) || fromN >= toN) continue;
+      if (!parentOf.has(toN) || fromN > parentOf.get(toN)) parentOf.set(toN, fromN);
+    }
+  }
+  const children = new Map();
+  const roots = [];
+  for (const c of calls) {
+    const parent = parentOf.get(c.n);
+    if (parent === undefined) roots.push(c);
+    else children.set(parent, [...(children.get(parent) ?? []), c]);
+  }
+  const byStart = (a, b) => (a.s ?? a.at) - (b.s ?? b.at);
+  roots.sort(byStart);
+  const out = [];
+  const walk = (c, depth) => {
+    out.push({ call: c, depth });
+    for (const child of (children.get(c.n) ?? []).sort(byStart)) walk(child, depth + 1);
+  };
+  for (const root of roots) walk(root, 0);
+  return out;
+}
+
 /** Per step: what it needs from earlier steps, what happens inside it and what it passes on. Lists of flow edges. */
 export function describeFlow(store, groups, only) {
   const ok = (key) => store.endpoints[key] && (!only || only.includes(key));
