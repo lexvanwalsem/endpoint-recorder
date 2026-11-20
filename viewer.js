@@ -421,7 +421,7 @@ function renderGraph(eps) {
       s('g', { class: `gm ${n.method}` }, s('rect', { class: 'pill', x: 12, y: 11, width: 52, height: 22, rx: 6 }), s('text', { x: 38, y: 26, 'text-anchor': 'middle' }, n.method)),
       s('text', { class: 'gpath', x: 74, y: 27 }, label),
       s('text', { class: 'gmeta', x: 14, y: 49 }, `${trunc(n.host, 26)}  ·  ${plural(n.count, 'call')}`),
-      mode === 'values' ? n.steps.slice(0, 3).map((num, i) => s('g', { class: 'gstep', transform: `translate(${nodeW - 16 - i * 22} 15)` }, s('circle', { r: 9 }), s('text', { y: 4, 'text-anchor': 'middle' }, String(num)))) : null,
+      mode === 'values' ? n.steps.slice(0, 3).map((num, i) => s('g', { class: 'gstep', transform: `translate(${nodeW - 16 - i * 22} 15)` }, s('rect', { x: -9, y: -9, width: 18, height: 18, rx: 5 }), s('text', { y: 4, 'text-anchor': 'middle' }, String(num)))) : null,
       n.errors ? s('circle', { class: 'gerr', cx: nodeW - 12, cy: nodeH - 12, r: 5 }) : null);
   });
 

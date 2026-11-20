@@ -307,3 +307,11 @@ header::before {
 .steps-mode #list .item:not(:last-child)::after { border-left: 1px solid color-mix(in srgb, var(--amber) 38%, transparent); left: 24.5px; }
 .gstep circle { fill: color-mix(in srgb, var(--amber) 9%, var(--surface)); stroke: color-mix(in srgb, var(--amber) 55%, transparent); stroke-width: 1; }
 .gstep text { font: 600 10.5px ui-monospace, "Cascadia Mono", Consolas, monospace; fill: var(--amber-ink); }
+
+/* Step markers, final form: a soft tinted tile with a number, no outline and not round */
+.wp, .wp.mini { border: 0; box-shadow: none; border-radius: 7px; background: color-mix(in srgb, var(--amber) 22%, var(--surface)); color: var(--amber-ink); }
+.wp { min-width: 26px; height: 26px; font-size: 12.5px; }
+.wp.mini { min-width: 20px; height: 20px; border-radius: 5px; font-size: 10.5px; }
+.wp-start { background: color-mix(in srgb, var(--amber) 10%, var(--surface)); border: 0; }
+.wp-start::after { width: 8px; height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--amber) 65%, transparent); }
+.gstep rect { fill: color-mix(in srgb, var(--amber) 16%, var(--surface)); stroke: none; }
