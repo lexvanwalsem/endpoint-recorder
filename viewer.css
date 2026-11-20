@@ -282,3 +282,13 @@ header::before {
 .multirow .n { margin-left: auto; padding-left: 12px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .multifoot { display: flex; gap: 8px; }
 .multifoot button { padding: 4px 12px; font-size: 13.5px; }
+
+/* Step markers in soft amber: a tint, a thin line and amber text, no solid fill */
+:root { --amber-ink: #8a5a00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --amber-ink: #e9bd5a; } }
+:root[data-theme="dark"] { --amber-ink: #e9bd5a; }
+.wp { background: var(--amber-weak); color: var(--amber-ink); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); font-weight: 600; }
+.wp-start { background: transparent; border: 1px dashed color-mix(in srgb, var(--amber) 55%, transparent); }
+.steps-mode #list .item.route::after { border-left-color: color-mix(in srgb, var(--amber) 35%, transparent); }
+.gstep circle { fill: var(--amber-weak); stroke: color-mix(in srgb, var(--amber) 55%, transparent); stroke-width: 1; }
+.gstep text { fill: var(--amber-ink); }
