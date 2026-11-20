@@ -292,3 +292,18 @@ header::before {
 .steps-mode #list .item.route::after { border-left-color: color-mix(in srgb, var(--amber) 35%, transparent); }
 .gstep circle { fill: var(--amber-weak); stroke: color-mix(in srgb, var(--amber) 55%, transparent); stroke-width: 1; }
 .gstep text { fill: var(--amber-ink); }
+
+/* Refined step markers: a hairline ring, fine tabular numerals, a thin route line */
+.wp {
+  min-width: 26px; height: 26px; padding: 0 2px; border-radius: 999px; box-sizing: border-box;
+  background: color-mix(in srgb, var(--amber) 9%, var(--surface)); color: var(--amber-ink);
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+  font: 600 12px/1 ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  box-shadow: 0 0 0 3px var(--surface);
+}
+.wp-start { background: var(--surface); border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); position: relative; }
+.wp-start::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--amber) 70%, transparent); }
+.wp.mini { min-width: 20px; height: 20px; font-size: 10.5px; box-shadow: none; }
+.steps-mode #list .item:not(:last-child)::after { border-left: 1px solid color-mix(in srgb, var(--amber) 38%, transparent); left: 24.5px; }
+.gstep circle { fill: color-mix(in srgb, var(--amber) 9%, var(--surface)); stroke: color-mix(in srgb, var(--amber) 55%, transparent); stroke-width: 1; }
+.gstep text { font: 600 10.5px ui-monospace, "Cascadia Mono", Consolas, monospace; fill: var(--amber-ink); }
