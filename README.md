@@ -136,6 +136,10 @@ branches in between. Click a block and the path that leads to it lights up, with
 which steps used them. Calls that are not linked to anything are listed underneath. Zoom with the buttons and scroll to
 move around.
 
+There is also a **By steps** layout: a column per step with the API calls made in it, linked across steps, with the order of
+the steps as a dashed arrow. It is the default when few values are passed on, so the whole session stays visible.
+Analytics and monitoring calls are left out of the steps and this graph.
+
 <p align="center">
   <img src="docs/graph.png" alt="A node graph: the path from looking up a customer to the shipment lights up, with the value on each line" width="900">
 </p>
@@ -183,8 +187,9 @@ Cookie and token values are never stored, only a short fingerprint to recognise 
 
 ### Find the problems
 
-Errors are flagged with a count. Average and slowest time and the transfer size are shown per endpoint. You can filter on
-errors, method, host and request type, and sort on calls, speed or recency.
+Errors are flagged with a count. Average and slowest time and the transfer size are shown per endpoint. The lists start with **API calls only**
+(XHR and fetch); untick it to see scripts, styles and other files. Method, host and request type are multi-select lists
+with counts and a search field. You can also filter on errors, and sort on calls, speed or recency.
 
 ### Take it with you
 
@@ -302,7 +307,7 @@ hint, not proof: check them. The newest call that returned a value is taken as i
 - Tokens in headers are followed by their fingerprint only, and only when the same value is sent back unchanged.
 - Header values that are not on the list of harmless ones are not kept, only the header names.
 - Bodies are read up to 50 MB; larger responses are listed with their size but without content.
-- Binary bodies (images, PDF, archives) are not shown, only their type and size.
+- Binary bodies (images, PDF, archives, compressed request bodies) are not shown, only their type and size.
 - Multipart uploads are listed, but their parts are not broken down.
 - Example calls are shortened: the first 3 items of lists, texts cut at 200 characters (4000 for text bodies),
   60 keys per object and 8 levels deep. The field structure and the value search look at the first 20 items of each list,
@@ -311,7 +316,7 @@ hint, not proof: check them. The newest call that returned a value is taken as i
 - Step detection is a heuristic: calls made while you pause between clicks can end up in the wrong step, and two quick
   actions can end up in one. Mark steps yourself when it matters.
 - Step names are guesses from the method and path, not knowledge of the system.
-- The graph only shows calls that are linked by a value Surveyor could follow (see below). Other calls are listed apart.
+- The value graph only shows calls that are linked by a value Surveyor could follow (see below). Other calls are listed apart; the step graph shows every API call.
 - Sub-calls are found in JSON batches (arrays) and in the root fields of GraphQL queries, not in other formats.
 - You only learn about what you click: calls you never trigger are not documented.
 - Chrome internal pages (`chrome://`) and the Chrome Web Store cannot be recorded.

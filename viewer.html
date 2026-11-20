@@ -27,9 +27,9 @@
     <div class="filters">
       <input id="q" type="search" placeholder="Search path, host, field name or example value">
       <div class="selects">
-        <select id="method"><option value="">All methods</option></select>
-        <select id="host"><option value="">All hosts</option></select>
-        <select id="type"><option value="">All types</option></select>
+        <details class="multi" id="method"></details>
+        <details class="multi" id="host"></details>
+        <details class="multi" id="type"></details>
         <select id="sort">
           <option value="count">Most calls</option>
           <option value="avg">Slowest</option>
@@ -40,6 +40,7 @@
       <div class="row">
         <label><input id="errorsOnly" type="checkbox"> Only errors</label>
         <label><input id="withBody" type="checkbox"> Only with JSON body</label>
+        <label><input id="apiList" type="checkbox" checked> Only API calls</label>
         <span id="count" class="muted" style="margin-left:auto"></span>
       </div>
     </div>

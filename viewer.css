@@ -251,3 +251,34 @@ header::before {
 .hdrrow { display: flex; gap: 14px; padding: 3px 0; align-items: baseline; }
 .hdrlabel { min-width: 130px; flex: none; color: var(--muted); font-size: 13.5px; }
 .hdrrow .mono { overflow-wrap: anywhere; font-size: 13.5px; }
+
+/* Tighter step markers: a small rounded tag in the accent colour instead of an orange disc with black text */
+.wp { border-radius: 8px; background: var(--accent-weak); color: var(--accent); border: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent); font-weight: 700; }
+.wp-start { background: transparent; border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
+.steps-mode #list .item.route::after { border-left-color: color-mix(in srgb, var(--accent) 38%, transparent); }
+.gstep circle { fill: var(--accent-weak); stroke: var(--accent); stroke-width: 1.4; }
+.gstep text { fill: var(--accent); }
+
+/* Graph by steps: column headers and the order of the steps */
+.gcol { cursor: pointer; }
+.gcol .ghead { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+.gcol:hover .ghead { stroke: var(--accent); }
+.gcol text { font: 600 13px system-ui, sans-serif; fill: var(--text); }
+.gseq { fill: none; stroke: var(--accent); stroke-opacity: .5; stroke-width: 2; stroke-dasharray: 6 5; }
+
+/* Multi-select filters */
+.multi { position: relative; min-width: 0; }
+.multi summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.multi summary::-webkit-details-marker { display: none; }
+.multi summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi summary::after { content: ''; flex: none; border: 5px solid transparent; border-top-color: var(--muted); margin-top: 5px; }
+.multi[open] summary { border-color: var(--accent); }
+.multipanel { position: absolute; z-index: 30; left: 0; top: calc(100% + 4px); min-width: 100%; width: max-content; max-width: 420px; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, .2); }
+.multilist { overflow: auto; max-height: 300px; }
+.multirow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+.multirow:hover { background: var(--panel); }
+.multirow[hidden] { display: none; }
+.multiname { overflow-wrap: anywhere; }
+.multirow .n { margin-left: auto; padding-left: 12px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.multifoot { display: flex; gap: 8px; }
+.multifoot button { padding: 4px 12px; font-size: 13.5px; }

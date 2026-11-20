@@ -100,12 +100,20 @@ export function normalizeMime(mime) {
   return String(mime ?? '').split(';')[0].trim().toLowerCase() || '(none)';
 }
 
+/** True when a text is mostly control or replacement characters: binary data that was decoded as text. */
+export function looksBinary(text) {
+  const sample = String(text).slice(0, 2000);
+  const bad = (sample.match(/[\u0000-\u0008\u000e-\u001f�]/g) ?? []).length;
+  return sample.length > 0 && bad / sample.length > 0.05;
+}
+
 /**
  * Classify a body.
  * -> { kind: 'json', value } | { kind: 'form', value } (both have fields) | { kind: 'text', text } | undefined (nothing readable)
  */
 export function parseBody(text, mime) {
   if (!text) return undefined;
+  if (looksBinary(text)) return undefined; // compressed or encrypted data that was read as text
   const m = normalizeMime(mime);
   if (m === 'application/x-www-form-urlencoded') {
     const value = {};
@@ -296,6 +304,7 @@ export function addEntry(store, entry, { keepExamples = false } = {}) {
       size: entry.size, type: entry.type, reqMime: entry.reqMime, resMime: entry.resMime, binary: entry.binary || undefined, skipped: entry.skipped,
     };
     if (req) { if (req.kind === 'text') sample.reqText = clip(req.text, ctx); else sample.req = shrink(req.value, ctx); }
+    if (!req && entry.reqText) sample.reqBinary = true;
     if (res) { if (res.kind === 'text') sample.resText = clip(res.text, ctx); else sample.res = shrink(res.value, ctx); }
     sample.cut = ctx.cut;
     (ep.samples ??= []).push(sample);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { addEntry, createStore, markStep, subOperations, toMarkdown } from '../recorder.mjs';
-import { addNav, buildGraph, buildRouteTree, describeCall, describeFlow, detectPolling, detectSteps, getSteps, lineage, nestCalls, routeTreeLines } from '../flow.mjs';
+import { addNav, buildGraph, buildRouteTree, buildStepGraph, isTracker, describeCall, describeFlow, detectPolling, detectSteps, getSteps, lineage, nestCalls, routeTreeLines } from '../flow.mjs';
 import { graphqlFields } from '../recorder.mjs';
 
 const BASE = 1_000_000;
@@ -287,5 +287,56 @@ test('sub-operations are stored on the endpoint and the call, and named in the r
     assert.deepEqual(ep.subs, { me: 1, orders: 1 });
     assert.deepEqual(store.calls[0].subs, ['me', 'orders']);
     assert.match(toMarkdown(store), /- Contains sub-calls: me x1, orders x1/);
+  });
+});
+
+test('analytics and monitoring calls are left out of the steps', () => {
+  withClock((tick) => {
+    const store = createStore();
+    tick(0); call(store, 'GET', 'https://app.example/api/tickets', {});
+    tick(100); call(store, 'POST', 'https://i.clarity.ms/collect', {});
+    tick(200); call(store, 'POST', 'https://o123.ingest.sentry.io/api/1/envelope/', {});
+    const steps = detectSteps(store);
+    assert.equal(steps.length, 1);
+    assert.deepEqual(steps[0].calls.map((c) => store.endpoints[c.key].host), ['app.example']);
+    assert.equal(isTracker('i.clarity.ms'), true);
+    assert.equal(isTracker('o123.ingest.sentry.io'), true);
+    assert.equal(isTracker('app.example.com'), false);
+    assert.equal(isTracker('notclarity.ms.example.org'), false);
+  });
+});
+
+test('step graph: a column per step with its API calls, links across steps, the order of the steps', () => {
+  const store = scenario();
+  call(store, 'GET', 'https://x.example/static/app.js', undefined, { type: 'Script', resMime: 'text/javascript' });
+  const groups = getSteps(store);
+  const graph = buildStepGraph(store, { groups });
+
+  assert.equal(graph.mode, 'steps');
+  assert.deepEqual(graph.columns.map((c) => [c.index, c.count]), [[1, 1], [2, 1], [3, 2], [4, 1]]);
+  assert.deepEqual(graph.sequence, [[0, 1], [1, 2], [2, 3]]);
+  assert.equal(graph.nodes.length, 5);
+  assert.equal(graph.nodes.some((n) => n.path.endsWith('app.js')), false); // scripts are not API calls
+  const col = (i) => graph.nodes.filter((n) => n.layer === i);
+  assert.equal(col(2).length, 2);
+  assert.ok(col(2)[1].y > col(2)[0].y); // stacked in the column
+  assert.ok(col(1)[0].x > col(0)[0].x);
+
+  const links = graph.edges.map((e) => [e.from.split('|')[0], e.to.split('|')[0], e.same]);
+  assert.deepEqual(links.sort(), [['0', '1', false], ['1', '2', false], ['2', '2', true], ['2', '3', false]].sort());
+  const focus = lineage(graph, graph.nodes.find((n) => n.path.endsWith('/close')).id);
+  assert.equal(focus.path.length, 4); // login, list, ticket, close
+});
+
+test('step graph: without steps there is nothing to draw, marked steps work too', () => {
+  assert.equal(buildStepGraph(createStore(), { groups: [] }).nodes.length, 0);
+  withClock((tick) => {
+    const store = createStore();
+    tick(0); markStep(store, 'First');
+    call(store, 'GET', 'https://x.example/api/a', {});
+    tick(10); markStep(store, 'Second');
+    call(store, 'GET', 'https://x.example/api/b', {});
+    const graph = buildStepGraph(store, { groups: getSteps(store) });
+    assert.deepEqual(graph.columns.map((c) => c.label), ['First', 'Second']);
   });
 });

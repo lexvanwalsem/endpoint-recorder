@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, createStore, flatten, formatBytes, normalizeMime, parseBody, toMarkdown } from '../recorder.mjs';
+import { addEntry, createStore, flatten, formatBytes, looksBinary, normalizeMime, parseBody, toMarkdown } from '../recorder.mjs';
 
 test('form-encoded request bodies become fields', () => {
   const store = createStore();
@@ -65,4 +65,12 @@ test('rpcHint prefers the inner Odoo call over the generic JSON-RPC method', asy
   assert.equal(rpcHint({ jsonrpc: '2.0', method: 'call', params: { model: 'mail.message', method: 'search_read' } }), 'mail.message.search_read');
   assert.equal(rpcHint({ method: 'getChats' }), 'getChats');
   assert.equal(rpcHint({ operationName: 'Tickets', variables: {} }), 'Tickets');
+});
+
+test('binary data read as text is recognised and not kept as a body', () => {
+  const rubbish = '\u0000\u0001\u0002��\u0003abc\u0004\u0005�'.repeat(20);
+  assert.equal(looksBinary(rubbish), true);
+  assert.equal(parseBody(rubbish, 'text/plain'), undefined);
+  assert.equal(looksBinary('{"a":1}'), false);
+  assert.equal(looksBinary(''), false);
 });

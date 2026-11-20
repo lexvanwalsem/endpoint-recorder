@@ -9,6 +9,10 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const GAP_MS = 1500; // a pause in the API traffic longer than this starts a new step
 const MAX_NAVS = 500;
 
+// Well-known analytics and monitoring services. Their calls say nothing about how the system works, so they are left out of the steps.
+const TRACKERS = /(^|\.)(clarity\.ms|sentry\.io|sentry-cdn\.com|google-analytics\.com|googletagmanager\.com|doubleclick\.net|hotjar\.(com|io)|segment\.(io|com)|mixpanel\.com|amplitude\.com|newrelic\.com|nr-data\.net|datadoghq\.com|bugsnag\.com|fullstory\.com|plausible\.io|posthog\.com|logrocket\.(com|io))$/i;
+export const isTracker = (host) => TRACKERS.test(String(host).replace(/:\d+$/, ''));
+
 /** Navigations of the recorded tab (page loads and route changes). They start a new step. */
 export function addNav(store, { url, at = Date.now() }) {
   const navs = (store.navs ??= []);
@@ -103,7 +107,7 @@ function describeGroup(group, store) {
 export function detectSteps(store, { gapMs = GAP_MS } = {}) {
   const polling = detectPolling(store);
   const calls = (store.calls ?? [])
-    .filter((c) => isApiCall(c) && !polling.has(c.key) && store.endpoints[c.key])
+    .filter((c) => isApiCall(c) && !polling.has(c.key) && store.endpoints[c.key] && !isTracker(store.endpoints[c.key].host))
     .sort((a, b) => (a.s ?? a.at) - (b.s ?? b.at));
   const navs = [...(store.navs ?? [])].sort((a, b) => a.at - b.at);
   const groups = [];
@@ -344,7 +348,7 @@ export function buildGraph(store, { keys, groups } = {}) {
     col.forEach((key, i) => {
       const ep = store.endpoints[key];
       nodes.push({
-        key, method: ep.method, path: ep.path, rpc: ep.rpc ?? '', host: ep.host, count: ep.count, errors: errorsOf(ep),
+        id: key, key, method: ep.method, path: ep.path, rpc: ep.rpc ?? '', host: ep.host, count: ep.count, errors: errorsOf(ep),
         steps: [...(stepsOf.get(key) ?? [])].sort((a, b) => a - b), layer: c,
         x: pad + c * (nodeW + gapX), y: pad + offset + i * (nodeH + gapY),
       });
@@ -354,6 +358,66 @@ export function buildGraph(store, { keys, groups } = {}) {
     nodes, edges, unlinked,
     width: pad * 2 + Math.max(1, columns.length) * nodeW + Math.max(0, columns.length - 1) * gapX,
     height: pad * 2 + tallest * nodeH + Math.max(0, tallest - 1) * gapY,
+  };
+}
+
+/**
+ * The same graph, drawn per step: a column per step with the API calls made in it, so the whole session is visible even when
+ * few values are passed between calls. Lines are values passed between calls (also across steps); `sequence` is the order of
+ * the steps. Calls to analytics services are left out.
+ * -> { nodes: [{ id, key, ..., layer: column, x, y }], edges: [{ id, from, to, labels, count, example, same }],
+ *      columns: [{ x, label, index, count }], sequence: [[from column, to column]], unlinked: [], width, height }
+ */
+export function buildStepGraph(store, { keys, groups } = {}) {
+  const ok = (key) => store.endpoints[key] && (!keys || keys.includes(key)) && !isTracker(store.endpoints[key].host);
+  const steps = (groups ?? []).filter((g) => g.index !== null);
+  const { nodeW, nodeH, gapY, pad } = GRAPH;
+  const colGap = 70;
+  const head = 46;
+  const nodes = [];
+  const columns = [];
+  const nodeIds = new Set();
+  const stepOf = new Map();
+  steps.forEach((g, col) => {
+    const perKey = new Map();
+    for (const c of g.calls) {
+      stepOf.set(c.n, g.index);
+      if (isApiCall(c) && ok(c.key)) perKey.set(c.key, (perKey.get(c.key) ?? 0) + 1);
+    }
+    const x = pad + col * (nodeW + colGap);
+    columns.push({ x, label: g.label, index: g.index + 1, count: perKey.size });
+    let row = 0;
+    for (const [key, n] of perKey) {
+      const ep = store.endpoints[key];
+      const id = `${g.index}|${key}`;
+      nodeIds.add(id);
+      nodes.push({ id, key, method: ep.method, path: ep.path, rpc: ep.rpc ?? '', host: ep.host, count: n, errors: errorsOf(ep), steps: [g.index + 1], layer: col, x, y: pad + head + row * (nodeH + gapY) });
+      row++;
+    }
+  });
+  const edgeMap = new Map();
+  for (const chain of Object.values(store.chains ?? {})) {
+    for (const [fromN, toN] of chain.pairs ?? []) {
+      const fs = stepOf.get(fromN);
+      const ts = stepOf.get(toN);
+      const from = `${fs}|${chain.from.key}`;
+      const to = `${ts}|${chain.to.key}`;
+      if (!nodeIds.has(from) || !nodeIds.has(to) || from === to) continue;
+      const id = `${from}>${to}`;
+      const e = edgeMap.get(id) ?? { id, from, to, labels: [], count: 0, example: chain.example, back: false, same: fs === ts };
+      const label = `${chain.from.path} -> ${chain.to.where}`;
+      if (!e.labels.includes(label) && e.labels.length < 4) e.labels.push(label);
+      e.count++;
+      edgeMap.set(id, e);
+    }
+  }
+  const tallest = Math.max(0, ...columns.map((c) => c.count));
+  return {
+    nodes, edges: [...edgeMap.values()], columns, unlinked: [],
+    sequence: columns.slice(1).map((_, i) => [i, i + 1]),
+    width: pad * 2 + Math.max(1, columns.length) * nodeW + Math.max(0, columns.length - 1) * colGap,
+    height: pad * 2 + head + tallest * nodeH + Math.max(0, tallest - 1) * gapY,
+    mode: 'steps',
   };
 }
 
@@ -383,7 +447,7 @@ export function lineage(graph, key) {
   const down = walk(key, forward, (e) => e.to);
 
   // one path from a start of the data to the node: always step back to the predecessor in the furthest column
-  const layerOf = new Map(graph.nodes.map((n) => [n.key, n.layer]));
+  const layerOf = new Map(graph.nodes.map((n) => [n.id ?? n.key, n.layer]));
   const path = [key];
   let current = key;
   for (let guard = 0; guard < graph.nodes.length; guard++) {
